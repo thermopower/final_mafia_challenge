@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(for dir in /c/Users/js/Desktop/final_mafia_challenge/docs/usecases/*/)",
+      "Bash(head:*)",
+      "Bash(done)",
+      "Bash(for file in /c/Users/js/Desktop/final_mafia_challenge/docs/usecases/*/spec.md)"
     ],
     "deny": [],
     "ask": []
