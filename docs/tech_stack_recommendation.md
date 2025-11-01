@@ -392,3 +392,584 @@ export default api
 4. **권한 관리**:
    - Supabase RLS(Row Level Security)로 데이터베이스 레벨 권한 설정
    - Django에서도 추가 권한 검증 가능
+
+---
+
+## 테스트 환경 구축 전략
+
+### TDD 원칙 준수
+프로젝트는 `docs/rules/tdd.md`에 명시된 **Red → Green → Refactor** 사이클을 엄격히 따릅니다.
+
+### 테스트 피라미드 전략
+
+```
+        /\
+       /  \  E2E Tests (10%)
+      /----\  - 실제 사용자 시나리오
+     /      \ - Playwright (Frontend)
+    /--------\ - pytest E2E (Backend)
+   /          \
+  / Integration\ Tests (20%)
+ /    Tests     \ - API Endpoints
+/--------------\ - 데이터 흐름 검증
+/              \
+/  Unit Tests   \ (70%)
+/   (Pure Logic) \ - Service Layer
+/------------------\ - Repository Layer
+     Fast & Many      - Utility Functions
+```
+
+### Backend 테스트 구조
+
+#### 1. Unit Tests (70%) - 순수 함수 중심
+**위치**: `apps/{app_name}/tests/unit/`
+
+**전략**:
+- **Service Layer**: Mock Repository를 사용한 비즈니스 로직 테스트
+- **Repository Layer**: In-memory SQLite DB 사용 (모킹 최소화)
+- **Utility Functions**: 완전 독립적인 순수 함수 테스트
+
+**예시**:
+```python
+# apps/dashboard/tests/unit/test_metric_calculator.py
+from apps.dashboard.services.metric_calculator import MetricCalculator
+from apps.dashboard.domain.models import PerformanceData
+from decimal import Decimal
+
+class TestMetricCalculator:
+    """순수 함수 테스트 - 외부 의존성 없음"""
+
+    def test_calculate_growth_rate_returns_correct_percentage(self):
+        # Arrange
+        calculator = MetricCalculator()
+        previous = Decimal("100")
+        current = Decimal("150")
+
+        # Act
+        growth_rate = calculator.calculate_growth_rate(previous, current)
+
+        # Assert
+        assert growth_rate == Decimal("50.0")
+
+    def test_calculate_growth_rate_handles_zero_previous(self):
+        # Arrange
+        calculator = MetricCalculator()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="이전 값은 0이 될 수 없습니다"):
+            calculator.calculate_growth_rate(Decimal("0"), Decimal("100"))
+```
+
+**모킹 최소화 원칙**:
+- Repository는 실제 In-memory DB를 사용하여 테스트
+- 외부 API 호출만 모킹 (Supabase Auth, Email Service 등)
+
+```python
+# apps/uploads/tests/unit/test_excel_parser.py
+import pytest
+from apps.uploads.services.excel_parser import PerformanceExcelParser
+
+class TestPerformanceExcelParser:
+    """파일 파싱 순수 로직 테스트"""
+
+    def test_parse_valid_excel_returns_correct_data_structure(self, tmp_path):
+        # Arrange
+        parser = PerformanceExcelParser()
+        excel_file = tmp_path / "test.xlsx"
+        # 실제 엑셀 파일 생성 (openpyxl 사용)
+        create_test_excel(excel_file, [
+            {"department": "컴퓨터공학과", "amount": 1000},
+        ])
+
+        # Act
+        result = parser.parse(str(excel_file))
+
+        # Assert
+        assert len(result) == 1
+        assert result[0].department == "컴퓨터공학과"
+        assert result[0].amount == Decimal("1000")
+```
+
+#### 2. Integration Tests (20%)
+**위치**: `apps/{app_name}/tests/integration/`
+
+**전략**:
+- Django TestClient 사용
+- 실제 Test Database 사용 (PostgreSQL)
+- API Request → Service → Repository → DB 전체 흐름 검증
+
+```python
+# apps/dashboard/tests/integration/test_dashboard_api.py
+import pytest
+from rest_framework.test import APIClient
+from django.contrib.auth import get_user_model
+
+@pytest.mark.django_db
+class TestDashboardAPI:
+    """API Endpoint 통합 테스트"""
+
+    def test_get_dashboard_returns_200_with_valid_data(self, authenticated_client):
+        # Arrange
+        # 실제 DB에 테스트 데이터 생성
+        PerformanceModel.objects.create(
+            department="컴퓨터공학과",
+            amount=1000,
+            date="2024-01-01"
+        )
+
+        # Act
+        response = authenticated_client.get('/api/dashboard/')
+
+        # Assert
+        assert response.status_code == 200
+        assert 'summary' in response.json()
+        assert response.json()['summary']['total_performance'] == 1000
+```
+
+#### 3. E2E Tests (10%)
+**위치**: `tests/e2e/`
+
+**전략**:
+- pytest + Playwright (또는 Selenium)
+- 실제 브라우저 시뮬레이션
+- 주요 사용자 플로우 검증
+
+```python
+# tests/e2e/test_excel_upload_flow.py
+import pytest
+from playwright.sync_api import Page
+
+@pytest.mark.e2e
+def test_user_can_upload_excel_and_view_dashboard(page: Page):
+    """E2E: 엑셀 업로드 → 대시보드 확인"""
+
+    # 1. 로그인
+    page.goto("http://localhost:3000/login")
+    page.fill('input[name="email"]', "test@example.com")
+    page.fill('input[name="password"]', "password123")
+    page.click('button[type="submit"]')
+
+    # 2. 엑셀 업로드
+    page.goto("http://localhost:3000/upload")
+    page.set_input_files('input[type="file"]', 'test_data.xlsx')
+    page.click('button:has-text("업로드")')
+
+    # 3. 성공 메시지 확인
+    assert page.locator('text=업로드 완료').is_visible()
+
+    # 4. 대시보드에서 데이터 확인
+    page.goto("http://localhost:3000/dashboard")
+    assert page.locator('text=컴퓨터공학과').is_visible()
+```
+
+### Frontend 테스트 구조
+
+#### 1. Component Unit Tests (70%)
+**도구**: Vitest + React Testing Library
+
+**전략**:
+- Props 기반 렌더링 테스트
+- 사용자 상호작용 테스트
+- API 호출은 MSW로 모킹
+
+```typescript
+// src/presentation/components/charts/BarChart.test.tsx
+import { render, screen } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import BarChart from './BarChart'
+
+describe('BarChart', () => {
+  it('renders chart with valid data', () => {
+    // Arrange
+    const mockData = [
+      { name: '컴퓨터공학과', value: 1000 },
+      { name: '전자공학과', value: 800 },
+    ]
+
+    // Act
+    render(<BarChart data={mockData} title="학과별 실적" />)
+
+    // Assert
+    expect(screen.getByText('학과별 실적')).toBeInTheDocument()
+    expect(screen.getByText('컴퓨터공학과')).toBeInTheDocument()
+  })
+
+  it('shows "no data" message when data is empty', () => {
+    // Arrange
+    const emptyData: any[] = []
+
+    // Act
+    render(<BarChart data={emptyData} title="학과별 실적" />)
+
+    // Assert
+    expect(screen.getByText(/데이터가 없습니다/i)).toBeInTheDocument()
+  })
+})
+```
+
+#### 2. Hook Tests
+```typescript
+// src/application/hooks/useAuth.test.ts
+import { renderHook, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { useAuth } from './useAuth'
+import { supabase } from '@/infrastructure/external/supabase'
+
+vi.mock('@/infrastructure/external/supabase')
+
+describe('useAuth', () => {
+  it('returns user when authenticated', async () => {
+    // Arrange
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: '123', email: 'test@example.com' } },
+      error: null,
+    })
+
+    // Act
+    const { result } = renderHook(() => useAuth())
+
+    // Assert
+    await waitFor(() => {
+      expect(result.current.user).toEqual({
+        id: '123',
+        email: 'test@example.com',
+      })
+    })
+  })
+})
+```
+
+#### 3. Integration Tests (20%)
+**도구**: MSW (Mock Service Worker)
+
+```typescript
+// src/services/api/dashboardApi.test.ts
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import { setupServer } from 'msw/node'
+import { http, HttpResponse } from 'msw'
+import { getDashboard } from './dashboardApi'
+
+const server = setupServer(
+  http.get('/api/dashboard/', () => {
+    return HttpResponse.json({
+      summary: { total_performance: 1000 },
+    })
+  })
+)
+
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+describe('dashboardApi', () => {
+  it('fetches dashboard data successfully', async () => {
+    // Act
+    const data = await getDashboard()
+
+    // Assert
+    expect(data.summary.total_performance).toBe(1000)
+  })
+})
+```
+
+#### 4. E2E Tests (10%)
+**도구**: Playwright
+
+```typescript
+// src/tests/e2e/dashboard.spec.ts
+import { test, expect } from '@playwright/test'
+
+test('user can view dashboard after login', async ({ page }) => {
+  // 1. 로그인
+  await page.goto('http://localhost:5173/login')
+  await page.fill('input[name="email"]', 'test@example.com')
+  await page.fill('input[name="password"]', 'password123')
+  await page.click('button[type="submit"]')
+
+  // 2. 대시보드 확인
+  await expect(page).toHaveURL(/.*dashboard/)
+  await expect(page.locator('h1')).toContainText('대시보드')
+
+  // 3. 차트 렌더링 확인
+  await expect(page.locator('[role="img"][aria-label="chart"]')).toBeVisible()
+})
+```
+
+### 테스트 도구 및 패키지
+
+#### Backend 테스트 패키지
+```txt
+# requirements/test.txt
+pytest>=7.4.0
+pytest-django>=4.5.0
+pytest-cov>=4.1.0              # 커버리지 측정
+pytest-mock>=3.11.0            # Mock 헬퍼
+pytest-xdist>=3.3.0            # 병렬 테스트 실행
+factory-boy>=3.3.0             # 테스트 데이터 팩토리
+faker>=19.0.0                  # 가짜 데이터 생성
+freezegun>=1.2.0               # 시간 Mock
+responses>=0.23.0              # HTTP Mock
+playwright>=1.38.0             # E2E 테스트
+```
+
+#### Frontend 테스트 패키지
+```json
+{
+  "devDependencies": {
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@vitest/ui": "^0.34.0",
+    "vitest": "^0.34.0",
+    "jsdom": "^22.1.0",
+    "msw": "^1.3.0",
+    "@playwright/test": "^1.38.0",
+    "c8": "^8.0.0"
+  }
+}
+```
+
+### 설정 파일
+
+#### pytest.ini
+```ini
+[pytest]
+DJANGO_SETTINGS_MODULE = config.settings.test
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts =
+    --strict-markers
+    --tb=short
+    --cov-report=html
+    --cov-report=term-missing
+    --cov-fail-under=80
+    -n auto
+markers =
+    unit: Unit tests (fast, isolated)
+    integration: Integration tests (DB access)
+    e2e: End-to-end tests (slow)
+    slow: Slow running tests
+```
+
+#### vitest.config.ts
+```typescript
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/tests/setup.ts',
+    coverage: {
+      provider: 'c8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/tests/',
+      ],
+      lines: 80,
+      functions: 80,
+      branches: 80,
+      statements: 80,
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
+```
+
+#### playwright.config.ts
+```typescript
+import { defineConfig, devices } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './src/tests/e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
+
+### CI/CD 통합
+
+#### .github/workflows/test.yml
+```yaml
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements/test.txt
+
+      - name: Run unit tests
+        run: |
+          cd backend
+          pytest -m unit --cov=apps --cov-report=xml
+
+      - name: Run integration tests
+        run: |
+          cd backend
+          pytest -m integration --cov=apps --cov-append --cov-report=xml
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: test_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run unit tests
+        run: |
+          cd frontend
+          npm run test:coverage
+
+      - name: Run E2E tests
+        run: |
+          cd frontend
+          npx playwright install --with-deps
+          npm run test:e2e
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/coverage-final.json
+```
+
+### TDD 워크플로우 체크리스트
+
+```markdown
+## 기능 개발 전 필수 체크리스트
+
+- [ ] 구현할 시나리오 목록 작성 (주석으로)
+- [ ] 가장 간단한 시나리오부터 시작
+- [ ] 🔴 RED: 실패하는 테스트 작성
+- [ ] 테스트 실행 → 올바른 이유로 실패하는지 확인
+- [ ] 🟢 GREEN: 최소한의 코드로 테스트 통과
+- [ ] 🔵 REFACTOR: 중복 제거, 네이밍 개선
+- [ ] 모든 테스트 여전히 통과하는지 확인
+- [ ] 작은 단위로 커밋
+- [ ] 다음 시나리오로 반복
+
+## PR 머지 전 필수 체크리스트
+
+- [ ] 모든 테스트 통과 (pytest / vitest)
+- [ ] 커버리지 80% 이상
+- [ ] 테스트 코드 품질 검토
+- [ ] CI/CD 파이프라인 통과
+- [ ] E2E 테스트 통과
+```
+
+### 모킹 최소화 전략 및 이유
+
+**원칙**: 가능한 실제 구현을 사용하고, 불가피한 경우만 모킹
+
+**모킹이 필요한 경우**:
+1. **외부 API 호출** (Supabase Auth, Email Service)
+   - 이유: 외부 서비스에 의존하면 테스트가 느려지고 불안정해짐
+   - 도구: `responses` (Backend), `msw` (Frontend)
+
+2. **시간 의존성** (현재 시각, 날짜 계산)
+   - 이유: 테스트 결과가 실행 시점에 따라 달라짐
+   - 도구: `freezegun`
+
+3. **파일 시스템** (대용량 파일 업로드)
+   - 이유: 테스트 속도 저하
+   - 도구: `tmp_path` fixture
+
+**모킹하지 않는 경우**:
+1. **데이터베이스**
+   - 대신 In-memory SQLite (unit) 또는 Test DB (integration) 사용
+   - 이유: 실제 DB 동작과 차이가 생길 수 있음
+
+2. **Repository Layer**
+   - 대신 실제 Repository 구현 사용
+   - 이유: Service 테스트에서 실제 데이터 흐름 검증 필요
+
+3. **순수 함수**
+   - 모킹 불필요 (입력 → 출력만 검증)
+
+**효과**:
+- 테스트가 실제 코드 동작을 정확히 반영
+- 리팩토링 시 테스트가 깨지지 않음 (구현 세부사항 독립적)
+- 테스트 유지보수 비용 감소
+
+---
