@@ -21,7 +21,20 @@
       "Bash(npm run build:*)",
       "Bash(backend/apps/data/apps.py)",
       "Bash(npm test:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(chmod:*)",
+      "Bash(base.txt)",
+      "Bash(if not exist venv python -m venv venv)",
+      "Bash(venvScriptspython.exe -m pip install --upgrade pip)",
+      "Bash(=2.10.1)",
+      "Bash(ping:*)",
+      "Bash(nslookup:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nUserflow 문서 업데이트 (v1.1.0)\n\nPRD 업데이트 내용에 따른 Userflow 문서 확장:\n- 4가지 CSV 데이터 타입 상세 구조 추가\n  1. 학과 KPI 데이터 (department_kpi.csv) - 8개 필수 컬럼\n  2. 논문 목록 (publication_list.csv) - 11개 필수 컬럼\n  3. 연구 과제 데이터 (research_project_data.csv) - 12개 필수 컬럼\n  4. 학생 명단 (student_roster.csv) - 11개 필수 컬럼\n\n- 각 CSV 타입별 실제 샘플 데이터 제공\n  - 컬럼명, 데이터 타입, 범위/형식, 예시 포함\n  - 실제 대학 데이터 기반 샘플 CSV 포함\n\n- 데이터 검증 규칙 명시\n  - 각 컬럼별 유효성 검사 규칙\n  - 중복 검사 기준\n  - 데이터 타입 및 범위 검증\n\n- 문서 구조 개선\n  - 목차에 세부 항목 추가\n  - 데이터 타입별 섹션 분리\n  - 개요 섹션 업데이트\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(NUL)",
+      "WebFetch(domain:docs.railway.com)",
+      "WebFetch(domain:nixpacks.com)"
     ],
     "deny": [],
     "ask": []
