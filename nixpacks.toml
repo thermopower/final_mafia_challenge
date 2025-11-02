@@ -2,7 +2,8 @@
 # Django Backend + React Frontend 통합 배포
 
 [phases.setup]
-# Python과 Node.js 자동 감지 (requirements.txt와 package.json 기반)
+# Python과 Node.js 명시적 설정
+nixPkgs = ["nodejs_20", "npm-10_x"]
 aptPkgs = ["postgresql-client"]
 
 [phases.install]
