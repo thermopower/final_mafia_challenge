@@ -3,7 +3,8 @@
 
 [phases.setup]
 # Python과 Node.js 명시적 설정
-nixPkgs = ["nodejs_20", "npm-10_x"]
+# Node.js 20에는 npm이 기본 포함되어 있으므로 npm을 별도로 지정하지 않음
+nixPkgs = ["nodejs_20"]
 aptPkgs = ["postgresql-client"]
 
 [phases.install]
