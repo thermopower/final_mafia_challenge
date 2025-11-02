@@ -26,11 +26,27 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Database - Railway PostgreSQL (auto-configured via DATABASE_URL)
 # Railway automatically sets DATABASE_URL environment variable
-DATABASES['default'] = dj_database_url.config(
-    default=config('DATABASE_URL', default=''),
-    conn_max_age=600,
-    conn_health_checks=True,
-)
+database_url = config('DATABASE_URL', default=None)
+if database_url:
+    DATABASES['default'] = dj_database_url.config(
+        default=database_url,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+else:
+    # Fallback to individual DB settings if DATABASE_URL not provided
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 600,
+        'OPTIONS': {
+            'connect_timeout': 10,
+        }
+    }
 
 # Security settings
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)

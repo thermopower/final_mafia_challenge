@@ -29,19 +29,30 @@ DEBUG=False
 ALLOWED_HOSTS=${{RAILWAY_PUBLIC_DOMAIN}},localhost,127.0.0.1
 ```
 
-### 2. Database (Supabase PostgreSQL)
+### 2. Database (Supabase PostgreSQL) - 필수!
+
+**중요**: Database 설정은 **반드시** 다음 두 방법 중 하나를 선택해야 합니다.
+
+#### 방법 1: DATABASE_URL 사용 (권장)
 
 ```bash
 # Database URL (Supabase Connection Pooler - Session Mode)
 DATABASE_URL=postgresql://postgres.atdtzgamsgpnkzjlktlo:JGu6OVp6vIVBibMM@aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres
+```
 
-# 개별 DB 설정 (백업용 - DATABASE_URL이 있으면 사용 안 됨)
+#### 방법 2: 개별 DB 변수 사용
+
+DATABASE_URL을 설정하지 **않으면** 다음 변수들을 **모두** 설정해야 합니다:
+
+```bash
 DB_NAME=postgres
 DB_USER=postgres.atdtzgamsgpnkzjlktlo
 DB_PASSWORD=JGu6OVp6vIVBibMM
 DB_HOST=aws-1-ap-southeast-2.pooler.supabase.com
 DB_PORT=5432
 ```
+
+**주의**: DATABASE_URL이 설정되면 개별 DB 변수는 무시됩니다.
 
 ### 3. Supabase Auth
 
@@ -89,14 +100,28 @@ SECURE_SSL_REDIRECT=True
 3. **Variables 탭 이동**
    - 상단 메뉴에서 "Variables" 클릭
 
-4. **환경변수 추가**
-   - "New Variable" 버튼 클릭
-   - 위의 환경변수들을 하나씩 추가
-   - Key-Value 형식으로 입력
+4. **환경변수 추가** (필수 순서대로)
+
+   **최소 필수 변수 (반드시 설정해야 함):**
+   1. `DJANGO_SETTINGS_MODULE` = `config.settings.production`
+   2. `SECRET_KEY` = (생성된 시크릿 키)
+   3. `DATABASE_URL` = `postgresql://postgres.atdtzgamsgpnkzjlktlo:JGu6OVp6vIVBibMM@aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres`
+   4. `ALLOWED_HOSTS` = `${{RAILWAY_PUBLIC_DOMAIN}},localhost,127.0.0.1`
+   5. `DEBUG` = `False`
+
+   **Supabase 변수 (인증 기능 사용 시 필수):**
+   6. `SUPABASE_URL` = `https://atdtzgamsgpnkzjlktlo.supabase.co`
+   7. `SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   8. `SUPABASE_JWT_SECRET` = `ADP1DHEVkX/mc8iNh8bJqjphRXDQr53Djo...`
 
 5. **자동 재배포**
    - 환경변수를 저장하면 Railway가 자동으로 재배포합니다
    - 재배포 완료 후 헬스체크가 성공해야 합니다
+
+6. **DATABASE_URL 확인**
+   - 가장 흔한 에러: DATABASE_URL 누락
+   - 반드시 위의 전체 URL을 정확히 입력하세요
+   - 공백이나 줄바꿈이 있으면 안 됩니다
 
 ---
 
