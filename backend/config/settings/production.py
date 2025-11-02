@@ -48,6 +48,15 @@ SECURE_HSTS_PRELOAD = True
 # WhiteNoise - Static file serving
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# React 빌드 파일을 Django static에 포함
+STATICFILES_DIRS = [
+    BASE_DIR.parent / 'frontend' / 'dist',  # React 빌드 파일 위치
+]
+
+# SPA (Single Page Application) 라우팅 지원
+# React Router를 위한 fallback: 모든 URL이 매칭되지 않으면 index.html로 서빙
+WHITENOISE_INDEX_FILE = True
+
 # Logging - Send errors to Sentry in production (optional)
 SENTRY_DSN = config('SENTRY_DSN', default='')
 if SENTRY_DSN:

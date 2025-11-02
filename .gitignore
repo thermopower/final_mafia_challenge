@@ -32,3 +32,10 @@ test_*.csv
 
 # Invalid paths
 C*UsersjsDesktop*
+
+# Railway deployment - Frontend build files
+frontend/dist/
+frontend/node_modules/
+
+# Railway deployment - Backend collected static files
+backend/staticfiles/

@@ -52,7 +52,9 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR.parent / 'frontend' / 'dist',  # React 빌드 파일의 index.html 서빙용
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

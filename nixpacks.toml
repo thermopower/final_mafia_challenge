@@ -1,0 +1,23 @@
+# Nixpacks Configuration for Railway Deployment
+# Python 3.11 + Node.js 20 LTS for Django + React unified deployment
+
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.11"
+NIXPACKS_NODE_VERSION = "20"
+
+[phases.setup]
+nixPkgs = ["python311", "nodejs-20_x", "npm"]
+
+[phases.install]
+cmds = [
+    # Install frontend dependencies and build
+    "cd frontend && npm ci && npm run build",
+    # Install backend dependencies
+    "cd ../backend && pip install -r requirements/production.txt"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "cd backend && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
