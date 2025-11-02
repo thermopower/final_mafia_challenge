@@ -18,6 +18,53 @@
 
 # IDE
 .claude/settings.local.json
+.vscode/
+.idea/
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+*.pot
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Windows temporary files
 NUL
