@@ -17,11 +17,21 @@ ALLOWED_HOSTS = config(
 )
 
 # CORS settings for production
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000',
-    cast=lambda v: [s.strip() for s in v.split(',')]
-)
+cors_origins_raw = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000')
+cors_origins = []
+for origin in cors_origins_raw.split(','):
+    origin = origin.strip()
+    # Skip empty or internal Railway domains without scheme
+    if origin and not origin.endswith('.railway.internal'):
+        # Add https:// if no scheme provided (except localhost)
+        if not origin.startswith(('http://', 'https://')):
+            if 'localhost' in origin or '127.0.0.1' in origin:
+                origin = f'http://{origin}'
+            else:
+                origin = f'https://{origin}'
+        cors_origins.append(origin)
+
+CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
 # Database - Railway PostgreSQL (auto-configured via DATABASE_URL)
@@ -64,14 +74,9 @@ SECURE_HSTS_PRELOAD = True
 # WhiteNoise - Static file serving
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# React 빌드 파일을 Django static에 포함
-STATICFILES_DIRS = [
-    BASE_DIR.parent / 'frontend' / 'dist',  # React 빌드 파일 위치
-]
-
-# SPA (Single Page Application) 라우팅 지원
-# React Router를 위한 fallback: 모든 URL이 매칭되지 않으면 index.html로 서빙
-WHITENOISE_INDEX_FILE = True
+# Frontend는 별도 배포 (Vercel/Railway)
+# Django는 API만 제공하므로 STATICFILES_DIRS 불필요
+# STATICFILES_DIRS = []  # 빈 리스트 또는 주석 처리
 
 # Logging - Send errors to Sentry in production (optional)
 SENTRY_DSN = config('SENTRY_DSN', default='')
