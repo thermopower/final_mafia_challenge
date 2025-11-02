@@ -1,5 +1,6 @@
 import React from 'react';
-import { Container, Box, Typography, Paper } from '@mui/material';
+import { Container, Box, Typography, Paper, Link as MuiLink } from '@mui/material';
+import { Link } from 'react-router-dom';
 import { LoginForm } from '@/presentation/components/forms/LoginForm';
 
 export const LoginPage: React.FC = () => {
@@ -21,6 +22,14 @@ export const LoginPage: React.FC = () => {
             로그인하여 계속하기
           </Typography>
           <LoginForm />
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              계정이 없으신가요?{' '}
+              <MuiLink component={Link} to="/signup" variant="body2">
+                회원가입
+              </MuiLink>
+            </Typography>
+          </Box>
         </Paper>
       </Box>
     </Container>

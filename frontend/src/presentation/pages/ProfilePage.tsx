@@ -21,7 +21,6 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useProfile } from '@/application/hooks/useProfile';
-import AppLayout from '@/presentation/components/layout/AppLayout';
 
 export default function ProfilePage() {
   const {
@@ -89,147 +88,143 @@ export default function ProfilePage() {
 
   if (loading && !profile) {
     return (
-      <AppLayout>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
-      </AppLayout>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <AppLayout>
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          프로필 관리
-        </Typography>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        프로필 관리
+      </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {successMessage}
-          </Alert>
-        )}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {successMessage}
+        </Alert>
+      )}
 
-        <Card>
-          <CardContent>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                기본 정보
-              </Typography>
+      <Card>
+        <CardContent>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              기본 정보
+            </Typography>
 
-              <TextField
-                fullWidth
-                label="이메일"
-                value={profile?.email || ''}
-                disabled
-                margin="normal"
-                helperText="이메일은 변경할 수 없습니다"
-              />
+            <TextField
+              fullWidth
+              label="이메일"
+              value={profile?.email || ''}
+              disabled
+              margin="normal"
+              helperText="이메일은 변경할 수 없습니다"
+            />
 
-              <TextField
-                fullWidth
-                label="이름"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={!editMode}
-                margin="normal"
-              />
+            <TextField
+              fullWidth
+              label="이름"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              disabled={!editMode}
+              margin="normal"
+            />
 
-              <TextField
-                fullWidth
-                label="부서"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                disabled={!editMode}
-                margin="normal"
-              />
+            <TextField
+              fullWidth
+              label="부서"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              disabled={!editMode}
+              margin="normal"
+            />
 
-              <TextField
-                fullWidth
-                label="역할"
-                value={profile?.role || ''}
-                disabled
-                margin="normal"
-                helperText="역할은 관리자만 변경할 수 있습니다"
-              />
-            </Box>
+            <TextField
+              fullWidth
+              label="역할"
+              value={profile?.role || ''}
+              disabled
+              margin="normal"
+              helperText="역할은 관리자만 변경할 수 있습니다"
+            />
+          </Box>
 
-            <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-              {!editMode ? (
-                <>
-                  <Button variant="contained" onClick={() => setEditMode(true)}>
-                    프로필 수정
-                  </Button>
-                  <Button variant="outlined" onClick={() => setPasswordModalOpen(true)}>
-                    비밀번호 변경
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="contained" onClick={handleSaveProfile} disabled={loading}>
-                    저장
-                  </Button>
-                  <Button variant="outlined" onClick={() => setEditMode(false)}>
-                    취소
-                  </Button>
-                </>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* 비밀번호 변경 모달 */}
-        <Dialog open={passwordModalOpen} onClose={() => setPasswordModalOpen(false)}>
-          <DialogTitle>비밀번호 변경</DialogTitle>
-          <DialogContent>
-            {passwordError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {passwordError}
-              </Alert>
+          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+            {!editMode ? (
+              <>
+                <Button variant="contained" onClick={() => setEditMode(true)}>
+                  프로필 수정
+                </Button>
+                <Button variant="outlined" onClick={() => setPasswordModalOpen(true)}>
+                  비밀번호 변경
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="contained" onClick={handleSaveProfile} disabled={loading}>
+                  저장
+                </Button>
+                <Button variant="outlined" onClick={() => setEditMode(false)}>
+                  취소
+                </Button>
+              </>
             )}
+          </Box>
+        </CardContent>
+      </Card>
 
-            <TextField
-              fullWidth
-              type="password"
-              label="현재 비밀번호"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              margin="normal"
-            />
+      {/* 비밀번호 변경 모달 */}
+      <Dialog open={passwordModalOpen} onClose={() => setPasswordModalOpen(false)}>
+        <DialogTitle>비밀번호 변경</DialogTitle>
+        <DialogContent>
+          {passwordError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {passwordError}
+            </Alert>
+          )}
 
-            <TextField
-              fullWidth
-              type="password"
-              label="새 비밀번호"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              margin="normal"
-              helperText="최소 8자 이상"
-            />
+          <TextField
+            fullWidth
+            type="password"
+            label="현재 비밀번호"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            margin="normal"
+          />
 
-            <TextField
-              fullWidth
-              type="password"
-              label="새 비밀번호 확인"
-              value={newPasswordConfirm}
-              onChange={(e) => setNewPasswordConfirm(e.target.value)}
-              margin="normal"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setPasswordModalOpen(false)}>취소</Button>
-            <Button onClick={handleChangePassword} variant="contained" disabled={loading}>
-              변경
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </AppLayout>
+          <TextField
+            fullWidth
+            type="password"
+            label="새 비밀번호"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            margin="normal"
+            helperText="최소 8자 이상"
+          />
+
+          <TextField
+            fullWidth
+            type="password"
+            label="새 비밀번호 확인"
+            value={newPasswordConfirm}
+            onChange={(e) => setNewPasswordConfirm(e.target.value)}
+            margin="normal"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordModalOpen(false)}>취소</Button>
+          <Button onClick={handleChangePassword} variant="contained" disabled={loading}>
+            변경
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   );
 }

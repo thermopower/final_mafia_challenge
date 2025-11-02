@@ -1,13 +1,12 @@
+# -*- coding: utf-8 -*-
 """
-Upload URLs
+Upload URL Configuration
 """
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from apps.uploads.presentation.views import ExcelUploadViewSet
+from django.urls import path
+from apps.uploads.presentation.views import FileUploadView
 
-router = DefaultRouter()
-router.register(r"upload", ExcelUploadViewSet, basename="upload")
+app_name = 'uploads'
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path('', FileUploadView.as_view(), name='file_upload'),
 ]

@@ -46,8 +46,17 @@ export const DashboardPage: React.FC = () => {
     return <ErrorMessage message="데이터를 불러올 수 없습니다" onRetry={refetch} />
   }
 
+  console.log('[DashboardPage] 받은 데이터:', data)
+
   // 연도 목록 생성 (현재 연도부터 5년 전까지)
   const years = Array.from({ length: 6 }, (_, i) => currentYear - i)
+
+  // Helper: change_rate에 따라 trend 계산
+  const getTrend = (changeRate: number): 'up' | 'down' | 'neutral' => {
+    if (changeRate > 1) return 'up'
+    if (changeRate < -1) return 'down'
+    return 'neutral'
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -94,38 +103,38 @@ export const DashboardPage: React.FC = () => {
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <KPICard
-            title="총 실적"
-            value={data.kpis.performance.value}
-            unit={data.kpis.performance.unit}
-            changeRate={data.kpis.performance.change_rate}
-            trend={data.kpis.performance.trend}
+            title="전임교원 수"
+            value={data.kpi_metrics?.full_time_faculty?.value || 0}
+            unit="명"
+            changeRate={data.kpi_metrics?.full_time_faculty?.change_rate || 0}
+            trend={getTrend(data.kpi_metrics?.full_time_faculty?.change_rate || 0)}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <KPICard
             title="논문 수"
-            value={data.kpis.papers.value}
-            unit={data.kpis.papers.unit}
-            changeRate={data.kpis.papers.change_rate}
-            trend={data.kpis.papers.trend}
+            value={data.kpi_metrics?.total_papers?.value || 0}
+            unit="편"
+            changeRate={data.kpi_metrics?.total_papers?.change_rate || 0}
+            trend={getTrend(data.kpi_metrics?.total_papers?.change_rate || 0)}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <KPICard
             title="학생 수"
-            value={data.kpis.students.value}
-            unit={data.kpis.students.unit}
-            changeRate={data.kpis.students.change_rate}
-            trend={data.kpis.students.trend}
+            value={data.kpi_metrics?.total_students?.value || 0}
+            unit="명"
+            changeRate={data.kpi_metrics?.total_students?.change_rate || 0}
+            trend={getTrend(data.kpi_metrics?.total_students?.change_rate || 0)}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <KPICard
             title="예산 집행률"
-            value={data.kpis.budget.value}
-            unit={data.kpis.budget.unit}
-            changeRate={data.kpis.budget.change_rate}
-            trend={data.kpis.budget.trend}
+            value={data.kpi_metrics?.budget_execution_rate?.value || 0}
+            unit="%"
+            changeRate={data.kpi_metrics?.budget_execution_rate?.change_rate || 0}
+            trend={getTrend(data.kpi_metrics?.budget_execution_rate?.change_rate || 0)}
           />
         </Grid>
       </Grid>
@@ -133,16 +142,16 @@ export const DashboardPage: React.FC = () => {
       {/* 차트 */}
       <Grid container spacing={3}>
         <Grid item xs={12} lg={6}>
-          <PerformanceTrendChart data={data.charts.performance_trend} />
+          <PerformanceTrendChart data={data.charts?.faculty_trend || []} />
         </Grid>
         <Grid item xs={12} lg={6}>
-          <PaperDistributionChart data={data.charts.paper_distribution} />
+          <PaperDistributionChart data={data.charts?.paper_distribution || []} />
         </Grid>
         <Grid item xs={12} lg={6}>
-          <BudgetRatioChart data={data.charts.budget_ratio} />
+          <BudgetRatioChart data={data.charts?.budget_by_item || []} />
         </Grid>
         <Grid item xs={12} lg={6}>
-          <StudentCountChart data={data.charts.student_count} />
+          <StudentCountChart data={data.charts?.students_by_program || []} />
         </Grid>
       </Grid>
     </Box>

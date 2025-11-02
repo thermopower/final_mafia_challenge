@@ -13,7 +13,7 @@ from infrastructure.authentication.supabase_auth import SupabaseAuthentication
 from apps.dashboard.services.dashboard_service import DashboardService
 from apps.dashboard.presentation.serializers import (
     DashboardResponseSerializer,
-    FilterParamsSerializer
+    DashboardFilterSerializer
 )
 
 
@@ -37,7 +37,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
         Query Parameters:
             - year (int, optional): 조회할 연도 (기본값: 현재 연도)
-            - department (str, optional): 부서명 (기본값: 'all')
+            - college (str, optional): 단과대학 (기본값: 'all')
 
         Returns:
             200 OK: 대시보드 데이터
@@ -46,7 +46,7 @@ class DashboardViewSet(viewsets.ViewSet):
             500 Internal Server Error: 서버 오류
         """
         # 쿼리 파라미터 검증
-        filter_serializer = FilterParamsSerializer(data=request.query_params)
+        filter_serializer = DashboardFilterSerializer(data=request.query_params)
         if not filter_serializer.is_valid():
             return Response(
                 filter_serializer.errors,
@@ -54,11 +54,11 @@ class DashboardViewSet(viewsets.ViewSet):
             )
 
         year = filter_serializer.validated_data.get('year', datetime.now().year)
-        department = filter_serializer.validated_data.get('department', 'all')
+        college = filter_serializer.validated_data.get('college', 'all')
 
         try:
             # 서비스 호출
-            dashboard_data = self.dashboard_service.get_dashboard_data(year, department)
+            dashboard_data = self.dashboard_service.get_dashboard_data(year, college)
 
             # 응답 직렬화
             response_serializer = DashboardResponseSerializer(dashboard_data)
@@ -67,7 +67,9 @@ class DashboardViewSet(viewsets.ViewSet):
 
         except Exception as e:
             # 에러 로깅 (실제로는 StructuredLogger 사용)
+            import traceback
             print(f"Dashboard error: {str(e)}")
+            print(traceback.format_exc())
 
             return Response(
                 {'error': '데이터를 불러오는 중 오류가 발생했습니다'},

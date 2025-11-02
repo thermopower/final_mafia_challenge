@@ -24,12 +24,20 @@ class CSVExportService:
     - 데이터 유형별 컬럼 헤더 정의
     """
 
-    # 데이터 유형별 CSV 헤더 정의
+    # 데이터 유형별 CSV 헤더 정의 (설계 문서 기준)
     HEADERS = {
-        DataType.PERFORMANCE: ["날짜", "항목", "금액", "카테고리", "설명"],
-        DataType.PAPER: ["게재일", "논문 제목", "저자", "학술지명", "분야", "DOI"],
-        DataType.STUDENT: ["학번", "이름", "학과", "학년", "상태"],
-        DataType.BUDGET: ["회계연도", "분기", "항목", "금액", "카테고리", "설명"],
+        DataType.DEPARTMENT_KPI: [
+            "평가년도", "단과대학", "학과", "취업률", "전임교원수", "초빙교원수", "기술이전수입", "학술대회개최"
+        ],
+        DataType.PUBLICATION: [
+            "논문ID", "게재일", "단과대학", "학과", "논문제목", "주저자", "참여저자", "학술지명", "저널등급", "ImpactFactor", "과제연계"
+        ],
+        DataType.RESEARCH_PROJECT: [
+            "집행ID", "과제번호", "과제명", "연구책임자", "소속학과", "지원기관", "총연구비", "집행일자", "집행항목", "집행금액", "상태", "비고"
+        ],
+        DataType.STUDENT_ROSTER: [
+            "학번", "이름", "단과대학", "학과", "학년", "과정구분", "학적상태", "성별", "입학년도", "지도교수", "이메일"
+        ],
     }
 
     def __init__(self, data_repository: Optional[DataRepository] = None):
@@ -58,8 +66,8 @@ class CSVExportService:
         elif items:
             data_type = items[0].data_type
         else:
-            # 기본값: PERFORMANCE
-            data_type = DataType.PERFORMANCE
+            # 기본값: DEPARTMENT_KPI
+            data_type = DataType.DEPARTMENT_KPI
 
         # 3. CSV 생성
         return self._generate_csv_content(items, data_type)
@@ -99,45 +107,68 @@ class CSVExportService:
         Returns:
             CSV 행 (리스트)
         """
-        if item.data_type == DataType.PERFORMANCE:
+        extra = item.extra_fields or {}
+
+        if item.data_type == DataType.DEPARTMENT_KPI:
+            # "평가년도", "단과대학", "학과", "취업률", "전임교원수", "초빙교원수", "기술이전수입", "학술대회개최"
             return [
-                item.date.isoformat() if item.date else "",
-                item.title or "",
-                str(item.amount) if item.amount else "",
-                item.category or "",
-                item.description or "",
+                str(extra.get("evaluation_year", "")),
+                item.category or "",  # college
+                extra.get("department", ""),
+                str(extra.get("employment_rate", "")),
+                str(extra.get("full_time_faculty", "")),
+                str(extra.get("visiting_faculty", "")),
+                str(extra.get("tech_transfer_income", "")),
+                str(extra.get("intl_conferences", "")),
             ]
 
-        elif item.data_type == DataType.PAPER:
-            extra = item.extra_fields or {}
+        elif item.data_type == DataType.PUBLICATION:
+            # "논문ID", "게재일", "단과대학", "학과", "논문제목", "주저자", "참여저자", "학술지명", "저널등급", "ImpactFactor", "과제연계"
             return [
+                extra.get("paper_id", ""),
                 item.date.isoformat() if item.date else "",
-                item.title or "",
-                extra.get("authors", ""),
+                extra.get("college", ""),
+                item.category or "",  # department
+                item.title or "",  # paper_title
+                extra.get("lead_author", ""),
+                extra.get("co_authors", ""),
                 extra.get("journal_name", ""),
-                item.category or "",
-                extra.get("doi", ""),
+                extra.get("journal_grade", ""),
+                str(extra.get("impact_factor", "")) if extra.get("impact_factor") is not None else "",
+                extra.get("project_linked", ""),
             ]
 
-        elif item.data_type == DataType.STUDENT:
-            extra = item.extra_fields or {}
+        elif item.data_type == DataType.RESEARCH_PROJECT:
+            # "집행ID", "과제번호", "과제명", "연구책임자", "소속학과", "지원기관", "총연구비", "집행일자", "집행항목", "집행금액", "상태", "비고"
+            return [
+                extra.get("execution_id", ""),
+                extra.get("project_number", ""),
+                item.title or "",  # project_name
+                extra.get("principal_investigator", ""),
+                item.category or "",  # department
+                extra.get("funding_agency", ""),
+                str(extra.get("total_budget", "")),
+                item.date.isoformat() if item.date else "",  # execution_date
+                extra.get("execution_item", ""),
+                str(extra.get("execution_amount", "")),
+                extra.get("status", ""),
+                item.description or "",  # remarks
+            ]
+
+        elif item.data_type == DataType.STUDENT_ROSTER:
+            # "학번", "이름", "단과대학", "학과", "학년", "과정구분", "학적상태", "성별", "입학년도", "지도교수", "이메일"
             return [
                 extra.get("student_id", ""),
                 item.title or "",  # name
+                extra.get("college", ""),
                 item.category or "",  # department
                 str(extra.get("grade", "")),
-                extra.get("status", ""),
-            ]
-
-        elif item.data_type == DataType.BUDGET:
-            extra = item.extra_fields or {}
-            return [
-                str(extra.get("fiscal_year", "")),
-                str(extra.get("quarter", "")) if extra.get("quarter") else "",
-                item.title or "",
-                str(item.amount) if item.amount else "",
-                item.category or "",
-                item.description or "",
+                extra.get("program_type", ""),
+                extra.get("enrollment_status", ""),
+                extra.get("gender", ""),
+                str(extra.get("admission_year", "")),
+                extra.get("advisor", ""),
+                extra.get("email", ""),
             ]
 
         else:

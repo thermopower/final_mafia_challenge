@@ -65,16 +65,23 @@ class ProfileView(APIView):
 def change_password(request):
     """비밀번호 변경 API
 
-    Supabase Auth API를 사용하여 비밀번호를 변경합니다.
+    현재 프론트엔드에서 Supabase Auth를 직접 호출하여 비밀번호를 변경합니다.
+    백엔드 API는 선택사항입니다.
+
+    Supabase Auth API 사용 예시 (프론트엔드):
+    - supabase.auth.updateUser({ password: new_password })
     """
     serializer = ChangePasswordSerializer(data=request.data)
 
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # TODO: Supabase Auth API 연동하여 비밀번호 변경
-    # 현재는 엔드포인트만 존재하고, 실제 구현은 Supabase Auth 연동 단계에서 수행
+    # 비밀번호 변경은 프론트엔드에서 Supabase Auth API를 직접 호출하는 것을 권장합니다.
+    # 백엔드 API 구현이 필요한 경우, Supabase Admin API를 사용하여 구현할 수 있습니다.
     return Response(
-        {'message': '비밀번호 변경 기능은 Supabase Auth 연동 후 사용 가능합니다'},
+        {
+            'message': '비밀번호 변경은 프론트엔드에서 Supabase Auth API를 직접 호출해주세요.',
+            'guide': 'supabase.auth.updateUser({ password: new_password })'
+        },
         status=status.HTTP_501_NOT_IMPLEMENTED
     )

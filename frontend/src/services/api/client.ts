@@ -12,24 +12,49 @@ const apiClient: AxiosInstance = axios.create({
 })
 
 // Request Interceptor: 토큰 자동 추가
-apiClient.interceptors.request.use(async (config) => {
-  const token = await authService.getAccessToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+apiClient.interceptors.request.use(
+  async (config) => {
+    const token = await authService.getAccessToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
   }
-  return config
-})
+)
 
-// Response Interceptor: 401 오류 시 토큰 갱신 시도
+// Response Interceptor: 401 오류 처리
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // 401 오류 → Refresh Token으로 갱신 시도
-    // 갱신 실패 → 로그인 페이지로 리다이렉트
-    if (error.response?.status === 401) {
-      // 리프레시 로직 (Supabase는 자동으로 처리)
-      window.location.href = '/login'
+    const originalRequest = error.config
+
+    // 401 오류 처리
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      try {
+        // Supabase의 세션 갱신 시도
+        const session = await authService.refreshSession()
+
+        if (session?.access_token) {
+          // 토큰이 갱신되면 원래 요청을 재시도
+          originalRequest.headers.Authorization = `Bearer ${session.access_token}`
+          return apiClient(originalRequest)
+        } else {
+          // 세션 갱신 실패 시 로그아웃
+          await authService.signOut()
+          return Promise.reject(error)
+        }
+      } catch (refreshError) {
+        // 갱신 실패 시 로그아웃
+        await authService.signOut()
+        return Promise.reject(error)
+      }
     }
+
     return Promise.reject(error)
   }
 )

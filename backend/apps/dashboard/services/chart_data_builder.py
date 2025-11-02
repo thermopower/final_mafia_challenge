@@ -5,14 +5,6 @@ Chart Data Builder
 차트 데이터 생성 로직
 """
 from typing import List, Dict, Any
-from decimal import Decimal
-
-from apps.dashboard.domain.models import (
-    Performance,
-    PaperCount,
-    StudentCount,
-    BudgetRatio
-)
 
 
 class ChartDataBuilder:
@@ -23,78 +15,180 @@ class ChartDataBuilder:
     """
 
     @staticmethod
-    def build_performance_trend(performances: List[Performance]) -> List[Dict[str, Any]]:
+    def build_department_employment_rate(data: List[Dict]) -> List[Dict[str, Any]]:
         """
-        실적 추세 라인 차트 데이터 생성
+        학과별 취업률 막대 그래프 데이터 생성
 
         Args:
-            performances: 실적 리스트
+            data: [{'department': '컴퓨터공학과', 'employment_rate': Decimal('87.5')}, ...]
 
         Returns:
-            List[Dict]: [{"month": "1월", "value": 12.5}, ...]
+            List[Dict]: [{"department": "컴퓨터공학과", "rate": 87.5}, ...]
         """
-        result = []
-        for perf in performances:
-            result.append({
-                'month': f'{perf.month}월',
-                'value': perf.amount
-            })
-        return result
+        return [
+            {
+                'department': item['department'],
+                'rate': float(item['employment_rate'])
+            }
+            for item in data
+        ]
 
     @staticmethod
-    def build_paper_distribution(paper_counts: List[PaperCount]) -> List[Dict[str, Any]]:
+    def build_faculty_trend(data: List[Dict]) -> List[Dict[str, Any]]:
         """
-        논문 분포 막대 차트 데이터 생성
+        연도별 교원 수 추이 라인 차트 데이터 생성
 
         Args:
-            paper_counts: 카테고리별 논문 수 리스트
+            data: [
+                {
+                    'evaluation_year': 2024,
+                    'total_full_time_faculty': 150,
+                    'total_visiting_faculty': 30
+                },
+                ...
+            ]
 
         Returns:
-            List[Dict]: [{"category": "SCI", "count": 120}, ...]
+            List[Dict]: [{"year": 2024, "full_time": 150, "visiting": 30}, ...]
         """
-        result = []
-        for pc in paper_counts:
-            result.append({
-                'category': pc.category,
-                'count': pc.count
-            })
-        return result
+        return [
+            {
+                'year': item['evaluation_year'],
+                'full_time': item['total_full_time_faculty'] or 0,
+                'visiting': item['total_visiting_faculty'] or 0
+            }
+            for item in data
+        ]
 
     @staticmethod
-    def build_budget_ratio(budget_ratios: List[BudgetRatio]) -> List[Dict[str, Any]]:
+    def build_tech_transfer_trend(data: List[Dict]) -> List[Dict[str, Any]]:
         """
-        예산 비율 파이 차트 데이터 생성
+        기술이전 수입액 추이 라인 차트 데이터 생성
 
         Args:
-            budget_ratios: 카테고리별 예산 비율 리스트
+            data: [{'evaluation_year': 2024, 'total_tech_transfer_income': Decimal('120.0')}, ...]
 
         Returns:
-            List[Dict]: [{"category": "인건비", "value": 45.2, "percentage": 51.7}, ...]
+            List[Dict]: [{"year": 2024, "income": 120.0}, ...]
         """
-        result = []
-        for br in budget_ratios:
-            result.append({
-                'category': br.category,
-                'value': br.amount,
-                'percentage': br.percentage
-            })
-        return result
+        return [
+            {
+                'year': item['evaluation_year'],
+                'income': float(item['total_tech_transfer_income'] or 0)
+            }
+            for item in data
+        ]
 
     @staticmethod
-    def build_student_count(student_counts: List[StudentCount]) -> List[Dict[str, Any]]:
+    def build_paper_distribution(data: List[Dict]) -> List[Dict[str, Any]]:
         """
-        학생 수 막대 차트 데이터 생성
+        SCIE/KCI 논문 분포 파이 차트 데이터 생성
 
         Args:
-            student_counts: 학과별 학생 수 리스트
+            data: [{'journal_grade': 'SCIE', 'count': 30}, ...]
 
         Returns:
-            List[Dict]: [{"department": "컴퓨터공학과", "count": 450}, ...]
+            List[Dict]: [{"grade": "SCIE", "count": 30}, ...]
         """
-        result = []
-        for sc in student_counts:
-            result.append({
-                'department': sc.department,
-                'count': sc.count
-            })
-        return result
+        return [
+            {
+                'grade': item['journal_grade'],
+                'count': item['count']
+            }
+            for item in data
+        ]
+
+    @staticmethod
+    def build_papers_by_department(data: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        학과별 논문 수 막대 그래프 데이터 생성
+
+        Args:
+            data: [{'department': '컴퓨터공학과', 'count': 10}, ...]
+
+        Returns:
+            List[Dict]: [{"department": "컴퓨터공학과", "count": 10}, ...]
+        """
+        return [
+            {
+                'department': item['department'],
+                'count': item['count']
+            }
+            for item in data
+        ]
+
+    @staticmethod
+    def build_students_by_program(data: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        과정별 학생 수 파이 차트 데이터 생성
+
+        Args:
+            data: [{'program_type': '학사', 'count': 280}, ...]
+
+        Returns:
+            List[Dict]: [{"program": "학사", "count": 280}, ...]
+        """
+        return [
+            {
+                'program': item['program_type'],
+                'count': item['count']
+            }
+            for item in data
+        ]
+
+    @staticmethod
+    def build_students_by_department(data: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        학과별 학생 수 막대 그래프 데이터 생성
+
+        Args:
+            data: [{'department': '컴퓨터공학과', 'count': 80}, ...]
+
+        Returns:
+            List[Dict]: [{"department": "컴퓨터공학과", "count": 80}, ...]
+        """
+        return [
+            {
+                'department': item['department'],
+                'count': item['count']
+            }
+            for item in data
+        ]
+
+    @staticmethod
+    def build_budget_by_item(data: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        집행 항목별 예산 파이 차트 데이터 생성
+
+        Args:
+            data: [{'execution_item': '연구장비 도입', 'total_amount': 150000000}, ...]
+
+        Returns:
+            List[Dict]: [{"item": "연구장비 도입", "amount": 150000000}, ...]
+        """
+        return [
+            {
+                'item': item['execution_item'],
+                'amount': item['total_amount']
+            }
+            for item in data
+        ]
+
+    @staticmethod
+    def build_budget_by_funder(data: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        지원 기관별 연구비 막대 그래프 데이터 생성
+
+        Args:
+            data: [{'funding_agency': '한국연구재단', 'total_budget': 500000000}, ...]
+
+        Returns:
+            List[Dict]: [{"funder": "한국연구재단", "amount": 500000000}, ...]
+        """
+        return [
+            {
+                'funder': item['funding_agency'],
+                'amount': item['total_budget']
+            }
+            for item in data
+        ]

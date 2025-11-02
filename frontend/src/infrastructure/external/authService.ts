@@ -11,6 +11,20 @@ export const authService = {
     return { data, error }
   },
 
+  async signUp(email: string, password: string, fullName?: string): Promise<{ data: any; error: any }> {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName || '',
+          role: 'user',
+        },
+      },
+    })
+    return { data, error }
+  },
+
   async signOut(): Promise<{ error: any }> {
     const { error } = await supabase.auth.signOut()
     return { error }
@@ -28,6 +42,18 @@ export const authService = {
       data: { session },
     } = await supabase.auth.getSession()
     return session?.access_token || null
+  },
+
+  async refreshSession(): Promise<any> {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.refreshSession()
+    if (error) {
+      console.error('세션 갱신 실패:', error)
+      return null
+    }
+    return session
   },
 
   async updatePassword(newPassword: string): Promise<{ error: any }> {

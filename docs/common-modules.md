@@ -181,10 +181,10 @@ class ExcelFileValidator:
     ALLOWED_EXTENSIONS = ['.xlsx', '.xls']
 
     REQUIRED_COLUMNS = {
-        'performance': ['날짜', '금액', '카테고리'],
-        'paper': ['제목', '저자', '게재일', '분야'],
-        'student': ['학번', '이름', '학과', '학년'],
-        'budget': ['항목', '금액', '카테고리'],
+        'department_kpi': ['평가년도', '단과대학', '학과', '졸업생 취업률 (%)', '전임교원 수 (명)'],
+        'publication': ['논문ID', '게재일', '학과', '논문제목', '주저자', '학술지명', '저널등급'],
+        'research_project': ['집행ID', '과제번호', '과제명', '연구책임자', '총연구비', '집행일자', '집행금액', '상태'],
+        'student_roster': ['학번', '이름', '학과', '학년', '과정구분', '학적상태', '성별', '입학년도', '이메일'],
     }
 
     @staticmethod
@@ -665,16 +665,79 @@ export interface User {
 
 // Dashboard.ts
 export interface DashboardSummary {
-  performance: PerformanceSummary
-  papers: PaperSummary
-  students: StudentSummary
-  budget: BudgetSummary
+  kpi_summary: DepartmentKPISummary
+  publication_stats: PublicationStats
+  student_stats: StudentStats
+  budget_summary: BudgetSummary
 }
 
-export interface PerformanceSummary {
+export interface DepartmentKPISummary {
+  avg_employment_rate: number
+  total_full_time_faculty: number
+  total_visiting_faculty: number
+  total_tech_transfer_income: number
+  total_intl_conferences: number
+  by_college: DepartmentKPIByCollege[]
+}
+
+export interface DepartmentKPIByCollege {
+  college: string
+  avg_employment_rate: number
+  total_faculty: number
+}
+
+export interface PublicationStats {
+  total_papers: number
+  scie_count: number
+  kci_count: number
+  avg_impact_factor: number
+  project_linked_ratio: number
+  by_department: PublicationByDepartment[]
+}
+
+export interface PublicationByDepartment {
+  department: string
+  count: number
+}
+
+export interface BudgetSummary {
+  total_budget: number
+  total_execution: number
+  execution_rate: number
+  by_item: BudgetByItem[]
+  by_agency: BudgetByAgency[]
+}
+
+export interface BudgetByItem {
+  execution_item: string
   total_amount: number
-  growth_rate: number
-  category_breakdown: CategoryBreakdown[]
+}
+
+export interface BudgetByAgency {
+  funding_agency: string
+  total_budget: number
+}
+
+export interface StudentStats {
+  total_students: number
+  by_program: StudentByProgram[]
+  by_status: StudentByStatus[]
+  by_department: StudentByDepartment[]
+}
+
+export interface StudentByProgram {
+  program_type: string
+  count: number
+}
+
+export interface StudentByStatus {
+  enrollment_status: string
+  count: number
+}
+
+export interface StudentByDepartment {
+  department: string
+  count: number
 }
 
 // Upload.ts
@@ -687,8 +750,8 @@ export interface UploadResponse {
   uploaded_at: string
 }
 
-export type DataType = 'performance' | 'paper' | 'student' | 'budget'
-export type UploadStatus = 'pending' | 'processing' | 'success' | 'failed'
+export type DataType = 'department_kpi' | 'publication' | 'research_project' | 'student_roster'
+export type UploadStatus = 'success' | 'partial' | 'failed'
 ```
 
 **테스트 시나리오**:
@@ -1430,13 +1493,27 @@ export const handlers = [
   // 대시보드 API
   http.get('/api/dashboard/', () => {
     return HttpResponse.json({
-      performance: {
-        total_amount: 1200000,
-        growth_rate: 15.5,
+      kpi_summary: {
+        avg_employment_rate: 87.5,
+        total_full_time_faculty: 34,
+        total_visiting_faculty: 12,
+        total_tech_transfer_income: 26.0,
+        total_intl_conferences: 5,
       },
-      papers: {
-        total_count: 45,
-        scie_count: 20,
+      publication_stats: {
+        total_papers: 45,
+        scie_count: 30,
+        kci_count: 15,
+        avg_impact_factor: 6.8,
+        project_linked_ratio: 0.73,
+      },
+      student_stats: {
+        total_students: 320,
+      },
+      budget_summary: {
+        total_budget: 1680000000,
+        total_execution: 393500000,
+        execution_rate: 0.23,
       },
     })
   }),

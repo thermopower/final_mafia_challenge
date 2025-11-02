@@ -7,18 +7,20 @@
  * - 자동 로그아웃 (30분 후)
  * - 사용자 활동 감지 및 타이머 리셋
  */
-import { useEffect, useState } from 'react'
-import { useLogout } from './useLogout'
+import { useEffect, useState, useCallback } from 'react'
 
-export const useInactivityTimeout = (timeoutMs: number = 30 * 60 * 1000) => {
-  const { logout } = useLogout()
+export const useInactivityTimeout = (timeoutMs: number = 30 * 60 * 1000, onTimeout?: () => void) => {
   const [showWarning, setShowWarning] = useState(false)
+
+  const resetTimers = useCallback(() => {
+    setShowWarning(false)
+  }, [])
 
   useEffect(() => {
     let warningTimer: NodeJS.Timeout
     let logoutTimer: NodeJS.Timeout
 
-    const resetTimers = () => {
+    const startTimers = () => {
       // 기존 타이머 정리
       clearTimeout(warningTimer)
       clearTimeout(logoutTimer)
@@ -33,12 +35,14 @@ export const useInactivityTimeout = (timeoutMs: number = 30 * 60 * 1000) => {
 
       // 30분 후 자동 로그아웃
       logoutTimer = setTimeout(() => {
-        logout()
+        if (onTimeout) {
+          onTimeout()
+        }
       }, timeoutMs)
     }
 
     const handleActivity = () => {
-      resetTimers()
+      startTimers()
     }
 
     // 활동 감지 이벤트 리스너 등록
@@ -48,7 +52,7 @@ export const useInactivityTimeout = (timeoutMs: number = 30 * 60 * 1000) => {
     window.addEventListener('touchstart', handleActivity)
 
     // 초기 타이머 시작
-    resetTimers()
+    startTimers()
 
     // 클린업: 타이머 정리 및 이벤트 리스너 제거
     return () => {
@@ -59,7 +63,7 @@ export const useInactivityTimeout = (timeoutMs: number = 30 * 60 * 1000) => {
       window.removeEventListener('scroll', handleActivity)
       window.removeEventListener('touchstart', handleActivity)
     }
-  }, [logout, timeoutMs])
+  }, [timeoutMs, onTimeout])
 
-  return { showWarning, setShowWarning }
+  return { showWarning, setShowWarning, resetTimers }
 }

@@ -1,0 +1,67 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test coverage
+coverage
+coverage/
+.nyc_output
+*.lcov
+htmlcov/
+
+# Vitest
+.vitest/
+vitest.config.ts.timestamp-*
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Build files
+build/
+dist/
+
+# Lock files (선택사항 - 팀 정책에 따라)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# OS files
+Thumbs.db
+Desktop.ini

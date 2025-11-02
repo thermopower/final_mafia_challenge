@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, FormControlLabel, Checkbox, Alert, CircularProgress } from '@mui/material';
 import { useAuth } from '@/application/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +10,6 @@ export const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +18,7 @@ export const LoginForm: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      // PublicRoute가 자동으로 /dashboard로 리다이렉트하므로 여기서는 navigate 불필요
     } catch (err: any) {
       setError(err.message || '로그인 중 오류가 발생했습니다');
     } finally {

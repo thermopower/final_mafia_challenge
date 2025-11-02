@@ -1,0 +1,37 @@
+# Core Django
+Django==5.0.1
+djangorestframework==3.14.0
+drf-spectacular==0.27.0  # API documentation
+
+# Database
+psycopg2-binary>=2.9.11  # Python 3.13 호환
+
+# Production Server
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Environment Variables
+python-decouple==3.8
+
+# Excel/Data Processing
+openpyxl==3.1.2
+pandas>=2.2.0  # Python 3.13 호환
+
+# Authentication
+PyJWT>=2.10.1  # Supabase Auth 호환
+
+# CORS
+django-cors-headers==4.3.1
+
+# Image Processing
+Pillow>=10.3.0  # Python 3.13 호환
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2024.1
+
+# Testing
+pytest==7.4.4
+pytest-django==4.7.0
+pytest-cov==4.1.0
+factory-boy==3.3.0

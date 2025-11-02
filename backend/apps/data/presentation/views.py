@@ -23,7 +23,7 @@ class DataListView(APIView):
         - page: int (기본값: 1)
         - page_size: int (기본값: 20, 허용값: 20/50/100)
         - ordering: str (기본값: -date, 허용값: date/-date/amount/-amount)
-        - type: str (optional, 예: performance/paper/student/budget)
+        - type: str (optional, 예: department_kpi/publication/research_project/student_roster)
         - year: int (optional)
         - search: str (optional, 최소 2자)
     """
@@ -110,7 +110,7 @@ class ExportView(APIView):
 
     GET /api/data/export/
     Query Parameters:
-        - type: str (optional, 예: performance/paper/student/budget)
+        - type: str (optional, 예: department_kpi/publication/research_project/student_roster)
         - year: int (optional)
         - search: str (optional, 최소 2자)
     """
@@ -151,7 +151,7 @@ class ExportView(APIView):
         # 5. 파일명 생성
         # 데이터 유형이 지정되지 않았으면 기본값 사용
         filename = self.service.generate_filename(
-            data_type if data_type else DataType.PERFORMANCE
+            data_type if data_type else DataType.DEPARTMENT_KPI
         )
 
         # 6. HttpResponse로 CSV 반환

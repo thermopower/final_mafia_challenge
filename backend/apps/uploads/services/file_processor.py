@@ -2,165 +2,128 @@
 """
 File Processor Service
 
-파일 업로드 전체 프로세스를 오케스트레이션합니다.
+CSV 파일 업로드 전체 프로세스를 오케스트레이션합니다.
 """
 import os
 import tempfile
-from typing import Optional
+from typing import Optional, Tuple, List, Dict
 from django.db import transaction
 from django.core.files.uploadedfile import UploadedFile
 
-from apps.uploads.services.excel_parser import ExcelParser
+from apps.uploads.services.parsers import (
+    DepartmentKPIParser,
+    PublicationParser,
+    ResearchProjectParser,
+    StudentRosterParser
+)
 from apps.uploads.services.data_validator import DataValidator
-from apps.uploads.services.column_mapper import ColumnMapper
-from apps.uploads.repositories.upload_repository import UploadRepository
-from apps.dashboard.repositories.performance_repository import PerformanceRepository
-from apps.dashboard.repositories.paper_repository import PaperRepository
+from apps.dashboard.repositories.department_kpi_repository import DepartmentKPIRepository
+from apps.dashboard.repositories.publication_repository import PublicationRepository
+from apps.dashboard.repositories.research_project_repository import ResearchProjectRepository
 from apps.dashboard.repositories.student_repository import StudentRepository
-from apps.dashboard.repositories.budget_repository import BudgetRepository
-from apps.uploads.domain.models import UploadResult, UploadRecord
-from apps.core.exceptions import ValidationError
-from infrastructure.logging.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 class FileProcessorService:
     """
-    파일 처리 서비스
+    CSV 파일 처리 서비스
 
     파일 저장, 파싱, 검증, DB 저장을 담당합니다.
     """
 
-    def __init__(self):
-        self.excel_parser = ExcelParser()
-        self.data_validator = DataValidator()
-        self.column_mapper = ColumnMapper()
-        self.upload_repo = UploadRepository()
-        self.performance_repo = PerformanceRepository()
-        self.paper_repo = PaperRepository()
-        self.student_repo = StudentRepository()
-        self.budget_repo = BudgetRepository()
+    # 데이터 타입별 파서 매핑
+    PARSER_MAP = {
+        'department_kpi': DepartmentKPIParser,
+        'publication': PublicationParser,
+        'research_project': ResearchProjectParser,
+        'student_roster': StudentRosterParser
+    }
+
+    # 데이터 타입별 Repository 매핑
+    REPOSITORY_MAP = {
+        'department_kpi': DepartmentKPIRepository,
+        'publication': PublicationRepository,
+        'research_project': ResearchProjectRepository,
+        'student_roster': StudentRepository
+    }
+
+    # 데이터 타입별 Validator 메서드 매핑
+    VALIDATOR_MAP = {
+        'department_kpi': DataValidator.validate_department_kpi,
+        'publication': DataValidator.validate_publication,
+        'research_project': DataValidator.validate_research_project,
+        'student_roster': DataValidator.validate_student_roster
+    }
 
     @transaction.atomic
     def process_file(
-        self, file: UploadedFile, data_type: str, user_id: str
-    ) -> UploadResult:
+        self, file: UploadedFile, data_type: str
+    ) -> Dict:
         """
-        파일 업로드 전체 프로세스
+        CSV 파일 업로드 전체 프로세스
 
         Args:
             file: 업로드된 파일
-            data_type: 데이터 유형 ('performance', 'paper', 'student', 'budget')
-            user_id: 업로드한 사용자 ID
+            data_type: 데이터 유형
+                ('department_kpi', 'publication', 'research_project', 'student_roster')
 
         Returns:
-            UploadResult: 업로드 결과
+            Dict: 업로드 결과
+                {
+                    'success': bool,
+                    'filename': str,
+                    'data_type': str,
+                    'rows_processed': int,
+                    'errors': List[str] (optional)
+                }
 
         Raises:
-            ValidationError: 검증 실패 시
+            ValueError: 데이터 타입 또는 파일 형식 오류
         """
         temp_file_path: Optional[str] = None
 
         try:
-            # 1. 임시 파일 저장
+            # 1. 데이터 타입 검증
+            if data_type not in self.PARSER_MAP:
+                raise ValueError(
+                    f"지원하지 않는 데이터 유형입니다: {data_type}. "
+                    f"허용된 값: {', '.join(self.PARSER_MAP.keys())}"
+                )
+
+            # 2. 파일 확장자 검증 (.csv만 허용)
+            if not file.name.lower().endswith('.csv'):
+                raise ValueError("CSV 파일만 업로드 가능합니다")
+
+            # 3. 임시 파일 저장
             temp_file_path = self._save_temp_file(file)
 
-            # 2. 파일 파싱
-            parsed_data = self.excel_parser.parse(temp_file_path)
-            logger.info(
-                f"Parsed {parsed_data.total_rows} rows from {file.name}"
-            )
+            # 4. 파일 파싱
+            parser_class = self.PARSER_MAP[data_type]
+            parsed_data = parser_class.parse(temp_file_path)
 
-            # 3. 데이터 검증
-            validation_result = self.data_validator.validate(
-                parsed_data.rows, data_type
-            )
+            # 5. 데이터 검증
+            validator_func = self.VALIDATOR_MAP[data_type]
+            is_valid, errors = validator_func(parsed_data)
 
-            if not validation_result.is_valid:
-                # 검증 실패 - 에러 정보와 함께 예외 발생
-                error_details = {}
+            if not is_valid:
+                return {
+                    'success': False,
+                    'filename': file.name,
+                    'data_type': data_type,
+                    'rows_processed': 0,
+                    'errors': errors
+                }
 
-                if validation_result.missing_columns:
-                    error_details["missing_columns"] = (
-                        validation_result.missing_columns
-                    )
-                    error_details["current_columns"] = parsed_data.headers
+            # 6. 데이터 저장
+            repository = self.REPOSITORY_MAP[data_type]
+            rows_processed = repository.bulk_create(parsed_data)
 
-                if validation_result.invalid_rows:
-                    error_details["invalid_rows"] = (
-                        validation_result.invalid_rows
-                    )
-
-                if validation_result.duplicates:
-                    error_details["duplicates"] = validation_result.duplicates
-
-                raise ValidationError(
-                    message=self._get_validation_error_message(
-                        validation_result
-                    ),
-                    error_code="VALIDATION_ERROR",
-                    details=error_details,
-                )
-
-            # 4. 업로드 레코드 생성 (pending 상태)
-            upload_record = self.upload_repo.create_upload_record(
-                UploadRecord(
-                    id=None,
-                    filename=file.name,
-                    data_type=data_type,
-                    file_size=file.size,
-                    rows_processed=0,
-                    rows_failed=0,
-                    status="processing",
-                    error_message=None,
-                    uploaded_by=user_id,
-                    uploaded_at=None,
-                    completed_at=None,
-                )
-            )
-
-            # 5. 데이터 저장 (Repository에 따라 분기)
-            rows_processed = self._save_data_to_db(
-                parsed_data.rows, data_type, user_id
-            )
-
-            # 6. 업로드 레코드 상태 업데이트 (success)
-            self.upload_repo.update_upload_status(
-                upload_record.id, "success", rows_processed, 0
-            )
-
-            logger.info(
-                f"Successfully processed {rows_processed} rows for {file.name}"
-            )
-
-            # 7. 업로드 결과 반환
-            updated_record = self.upload_repo.get_by_id(upload_record.id)
-
-            return UploadResult(
-                success=True, upload_record=updated_record, errors=None
-            )
-
-        except ValidationError as e:
-            # 검증 오류 - 그대로 재발생
-            logger.warning(f"Validation error: {e.message}")
-            raise
-
-        except Exception as e:
-            # 예상치 못한 오류
-            logger.error(f"Unexpected error during file processing: {str(e)}")
-
-            # 업로드 레코드가 생성되었다면 상태 업데이트
-            if "upload_record" in locals():
-                self.upload_repo.update_upload_status(
-                    upload_record.id, "failed", 0, parsed_data.total_rows
-                )
-
-            raise ValidationError(
-                message="업로드 중 오류가 발생했습니다",
-                error_code="INTERNAL_ERROR",
-                details={"error": str(e)},
-            )
+            # 7. 성공 결과 반환
+            return {
+                'success': True,
+                'filename': file.name,
+                'data_type': data_type,
+                'rows_processed': rows_processed
+            }
 
         finally:
             # 8. 임시 파일 삭제
@@ -197,53 +160,5 @@ class FileProcessorService:
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-                logger.debug(f"Cleaned up temp file: {file_path}")
-        except Exception as e:
-            logger.warning(f"Failed to cleanup temp file: {str(e)}")
-
-    def _save_data_to_db(
-        self, data: list, data_type: str, user_id: str
-    ) -> int:
-        """
-        데이터를 DB에 저장
-
-        Args:
-            data: 파싱된 데이터 리스트
-            data_type: 데이터 유형
-            user_id: 업로드한 사용자 ID
-
-        Returns:
-            int: 저장된 행 수
-        """
-        if data_type == "performance":
-            return self.performance_repo.bulk_create(data, user_id)
-        elif data_type == "paper":
-            return self.paper_repo.bulk_create(data, user_id)
-        elif data_type == "student":
-            return self.student_repo.bulk_create(data, user_id)
-        elif data_type == "budget":
-            return self.budget_repo.bulk_create(data, user_id)
-        else:
-            raise ValidationError(
-                message=f"지원하지 않는 데이터 유형입니다: {data_type}",
-                error_code="INVALID_DATA_TYPE",
-            )
-
-    def _get_validation_error_message(self, validation_result) -> str:
-        """
-        검증 오류 메시지 생성
-
-        Args:
-            validation_result: 검증 결과
-
-        Returns:
-            str: 오류 메시지
-        """
-        if validation_result.missing_columns:
-            return "필수 컬럼이 누락되었습니다"
-        elif validation_result.invalid_rows:
-            return "데이터 형식 오류"
-        elif validation_result.duplicates:
-            return "중복 데이터 발견"
-        else:
-            return "데이터 검증 실패"
+        except Exception:
+            pass  # 임시 파일 삭제 실패는 무시

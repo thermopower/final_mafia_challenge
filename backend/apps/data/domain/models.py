@@ -14,11 +14,19 @@ from enum import Enum
 
 
 class DataType(str, Enum):
-    """데이터 유형 Enum"""
-    PERFORMANCE = "performance"
-    PAPER = "paper"
-    STUDENT = "student"
-    BUDGET = "budget"
+    """
+    데이터 유형 Enum
+
+    4가지 CSV 타입과 매핑:
+    - department_kpi: 학과 KPI 데이터
+    - publication: 논문 목록
+    - research_project: 연구 과제 데이터
+    - student_roster: 학생 명단
+    """
+    DEPARTMENT_KPI = "department_kpi"
+    PUBLICATION = "publication"
+    RESEARCH_PROJECT = "research_project"
+    STUDENT_ROSTER = "student_roster"
 
 
 @dataclass

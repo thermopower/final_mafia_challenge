@@ -4,163 +4,170 @@ Student Repository
 
 학생 데이터 접근 계층
 """
-from typing import List
-from django.db.models import Count
+from typing import List, Dict, Optional
+from django.db.models import Count, Q, Value
+from django.db.models.functions import Coalesce
+from django.db import transaction
 
-from apps.core.repositories.base_repository import BaseRepository
-from apps.dashboard.persistence.models import Student as StudentORM
-from apps.dashboard.domain.models import Student, StudentCount
+from apps.dashboard.persistence.models import Student
 
 
-class StudentRepository(BaseRepository):
+class StudentRepository:
     """
-    학생 Repository
+    학생 데이터 Repository
 
-    ORM 쿼리를 도메인 모델로 변환합니다.
+    데이터베이스 CRUD 작업 및 통계 조회를 제공합니다.
     """
-    model = StudentORM
 
-    def get_count_by_year(self, year: int, department: str = 'all') -> int:
+    @staticmethod
+    def bulk_create(data_list: List[Dict]) -> int:
         """
-        연도별 학생 수 조회 (재학생만)
+        대량 데이터 삽입
 
         Args:
-            year: 조회할 연도
-            department: 부서명 (기본값: 'all')
+            data_list: 삽입할 데이터 리스트
+                [
+                    {
+                        'student_id': '20201101',
+                        'name': '김유진',
+                        'college': '공과대학',
+                        'department': '컴퓨터공학과',
+                        'grade': 3,
+                        'program_type': '학사',
+                        'enrollment_status': '재학',
+                        'gender': '남',
+                        'admission_year': 2020,
+                        'advisor': None,
+                        'email': 'yjkim@university.ac.kr'
+                    },
+                    ...
+                ]
 
         Returns:
-            int: 재학생 수
+            int: 삽입된 행 수
         """
-        queryset = self.model.objects.filter(
-            is_deleted=False,
-            status='active'
-        )
+        if not data_list:
+            return 0
 
-        # 연도 필터 (student_id가 연도를 포함한다고 가정)
-        # 예: student_id가 "2024001" 형식이라면
-        queryset = queryset.filter(student_id__startswith=str(year))
+        with transaction.atomic():
+            objects = [Student(**data) for data in data_list]
+            created = Student.objects.bulk_create(
+                objects,
+                ignore_conflicts=False  # 중복 시 에러 발생
+            )
+            return len(created)
 
-        # if department != 'all':
-        #     queryset = queryset.filter(department=department)
-
-        return queryset.count()
-
-    def get_count_by_department(self, year: int) -> List[StudentCount]:
+    @staticmethod
+    def get_count_by_department(status: Optional[str] = None) -> List[Dict]:
         """
         학과별 학생 수 조회
 
         Args:
-            year: 조회할 연도
+            status: 학적 상태 ('재학', '휴학', '졸업', None이면 전체)
 
         Returns:
-            List[StudentCount]: 학과별 학생 수 리스트
+            List[Dict]: 학과별 데이터
+                [
+                    {
+                        'department': '컴퓨터공학과',
+                        'count': 80
+                    },
+                    ...
+                ]
         """
-        queryset = self.model.objects.filter(
-            is_deleted=False,
-            status='active'
-        )
+        queryset = Student.objects.all()
 
-        # 연도 필터
-        queryset = queryset.filter(student_id__startswith=str(year))
+        if status:
+            queryset = queryset.filter(enrollment_status=status)
 
-        # 학과별 집계
-        distribution = queryset.values('department').annotate(
+        result = queryset.values('department').annotate(
             count=Count('id')
         ).order_by('-count')
 
-        return [
-            StudentCount(
-                department=item['department'],
-                count=item['count']
-            )
-            for item in distribution
-        ]
+        return list(result)
 
-    def get_all_by_year(self, year: int, department: str = 'all') -> List[Student]:
+    @staticmethod
+    def get_stats(status: str = '재학') -> Dict:
         """
-        연도별 학생 전체 조회
+        학생 통계 조회
 
         Args:
-            year: 조회할 연도
-            department: 부서명 (기본값: 'all')
+            status: 학적 상태 (기본값: '재학')
 
         Returns:
-            List[Student]: 학생 리스트
+            Dict: 학생 통계
+                {
+                    'total_students': int,
+                    'by_program': [
+                        {'program_type': '학사', 'count': 280},
+                        ...
+                    ],
+                    'by_status': [
+                        {'enrollment_status': '재학', 'count': 290},
+                        ...
+                    ]
+                }
         """
-        queryset = self.model.objects.filter(
-            is_deleted=False,
-            status='active',
-            student_id__startswith=str(year)
+        # 재학생만 카운트
+        total_students = Student.objects.filter(enrollment_status=status).count()
+
+        by_program = list(
+            Student.objects.filter(enrollment_status=status).values('program_type').annotate(
+                count=Count('id')
+            ).order_by('program_type')
         )
 
-        # if department != 'all':
-        #     queryset = queryset.filter(department=department)
-
-        students = queryset.order_by('student_id')
-
-        return [self._to_domain(student) for student in students]
-
-    def _to_domain(self, orm_obj: StudentORM) -> Student:
-        """ORM 모델 → 도메인 모델 변환"""
-        return Student(
-            id=orm_obj.id,
-            department=orm_obj.department
+        by_status = list(
+            Student.objects.values('enrollment_status').annotate(
+                count=Count('id')
+            ).order_by('enrollment_status')
         )
 
-    def bulk_create(self, students: List[dict], user_id: str) -> int:
+        return {
+            'total_students': total_students,
+            'by_program': by_program,
+            'by_status': by_status
+        }
+
+    @staticmethod
+    def get_by_program(status: str = '재학') -> List[Dict]:
         """
-        학생 데이터 배치 생성
+        과정별 학생 수 조회 (파이 차트용)
 
         Args:
-            students: 학생 데이터 리스트 (파싱된 딕셔너리)
-            user_id: 업로드한 사용자 ID
+            status: 학적 상태 (기본값: '재학')
 
         Returns:
-            int: 생성된 행 수
+            List[Dict]: 과정별 데이터
+                [
+                    {
+                        'program_type': '학사',
+                        'count': 280
+                    },
+                    ...
+                ]
         """
-        from apps.accounts.persistence.models import UserProfile
+        queryset = Student.objects.filter(enrollment_status=status)
 
-        user = UserProfile.objects.get(id=user_id)
+        result = queryset.values('program_type').annotate(
+            count=Count('id')
+        ).order_by('program_type')
 
-        student_objs = [
-            StudentORM(
-                student_id=student['student_id'],
-                name=student['name'],
-                department=student['department'],
-                grade=student['grade'],
-                status=student.get('status', 'active'),
-                uploaded_by=user
-            )
-            for student in students
-        ]
+        return list(result)
 
-        StudentORM.objects.bulk_create(student_objs)
-        return len(student_objs)
-
-    def check_duplicates(self, students: List[dict]) -> List[dict]:
+    @staticmethod
+    def delete_by_student_ids(student_ids: List[str]) -> int:
         """
-        중복 데이터 확인
+        학번 목록으로 삭제
 
         Args:
-            students: 학생 데이터 리스트
+            student_ids: 학번 리스트
 
         Returns:
-            List[dict]: 중복된 데이터 리스트
+            int: 삭제된 행 수
         """
-        duplicates = []
+        deleted_count, _ = Student.objects.filter(
+            student_id__in=student_ids
+        ).delete()
 
-        for student in students:
-            exists = StudentORM.objects.filter(
-                student_id=student['student_id'],
-                is_deleted=False
-            ).exists()
-
-            if exists:
-                duplicates.append(student)
-
-        return duplicates
-
-    def _to_orm(self, domain_obj: Student) -> StudentORM:
-        """도메인 모델 → ORM 모델 변환"""
-        # 이 메서드는 create/update 시 사용
-        pass
+        return deleted_count
