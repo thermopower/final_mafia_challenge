@@ -13,7 +13,7 @@ from django.db.models import Q, QuerySet
 from django.core.paginator import Paginator
 
 from apps.data.domain.models import DataType, DataFilter, UnifiedDataItem, PaginatedDataResult
-from apps.dashboard.persistence.models import Performance, Paper, Student, Budget
+from apps.dashboard.persistence.models import DepartmentKPI, Publication, ResearchProject, Student
 
 
 class DataRepository:
@@ -93,7 +93,7 @@ class DataRepository:
         """
         model_class = self._get_model_class(data_type)
         try:
-            obj = model_class.objects.get(id=obj_id, is_deleted=False)
+            obj = model_class.objects.get(id=obj_id)
             return self._to_domain(obj, data_type)
         except model_class.DoesNotExist:
             return None
@@ -144,28 +144,28 @@ class DataRepository:
         """
         querysets = []
 
-        if data_type is None or data_type == DataType.PERFORMANCE:
+        if data_type is None or data_type == DataType.DEPARTMENT_KPI:
             querysets.append((
-                DataType.PERFORMANCE,
-                Performance.objects.filter(is_deleted=False).select_related('uploaded_by')
+                DataType.DEPARTMENT_KPI,
+                DepartmentKPI.objects.all()
             ))
 
-        if data_type is None or data_type == DataType.PAPER:
+        if data_type is None or data_type == DataType.PUBLICATION:
             querysets.append((
-                DataType.PAPER,
-                Paper.objects.filter(is_deleted=False).select_related('uploaded_by')
+                DataType.PUBLICATION,
+                Publication.objects.all()
             ))
 
-        if data_type is None or data_type == DataType.STUDENT:
+        if data_type is None or data_type == DataType.RESEARCH_PROJECT:
             querysets.append((
-                DataType.STUDENT,
-                Student.objects.filter(is_deleted=False).select_related('uploaded_by')
+                DataType.RESEARCH_PROJECT,
+                ResearchProject.objects.all()
             ))
 
-        if data_type is None or data_type == DataType.BUDGET:
+        if data_type is None or data_type == DataType.STUDENT_ROSTER:
             querysets.append((
-                DataType.BUDGET,
-                Budget.objects.filter(is_deleted=False).select_related('uploaded_by')
+                DataType.STUDENT_ROSTER,
+                Student.objects.all()
             ))
 
         return querysets
@@ -189,29 +189,39 @@ class DataRepository:
         """
         # 연도 필터
         if filters.year:
-            if data_type in [DataType.PERFORMANCE, DataType.PAPER]:
-                date_field = 'date' if data_type == DataType.PERFORMANCE else 'publication_date'
-                queryset = queryset.filter(**{f'{date_field}__year': filters.year})
-            elif data_type == DataType.BUDGET:
-                queryset = queryset.filter(fiscal_year=filters.year)
-            # Student는 연도 필터가 없음
+            if data_type == DataType.DEPARTMENT_KPI:
+                queryset = queryset.filter(evaluation_year=filters.year)
+            elif data_type == DataType.PUBLICATION:
+                queryset = queryset.filter(publication_date__year=filters.year)
+            elif data_type == DataType.RESEARCH_PROJECT:
+                queryset = queryset.filter(execution_date__year=filters.year)
+            elif data_type == DataType.STUDENT_ROSTER:
+                queryset = queryset.filter(admission_year=filters.year)
 
-        # 검색어 필터 (title, description, category에서 부분 일치)
-        if filters.search:
+        # 검색어 필터 (2자 이상, 설계 문서 BR-201 기준)
+        if filters.search and len(filters.search) >= 2:
             search_q = Q()
-            if data_type == DataType.PERFORMANCE:
-                search_q |= Q(title__icontains=filters.search)
-                search_q |= Q(description__icontains=filters.search)
-                search_q |= Q(category__icontains=filters.search)
-            elif data_type == DataType.PAPER:
-                search_q |= Q(title__icontains=filters.search)
-                search_q |= Q(authors__icontains=filters.search)
-            elif data_type == DataType.STUDENT:
+            if data_type == DataType.DEPARTMENT_KPI:
+                # 단과대학, 학과
+                search_q |= Q(college__icontains=filters.search)
+                search_q |= Q(department__icontains=filters.search)
+            elif data_type == DataType.PUBLICATION:
+                # 논문제목, 주저자, 참여저자, 학술지명
+                search_q |= Q(paper_title__icontains=filters.search)
+                search_q |= Q(lead_author__icontains=filters.search)
+                search_q |= Q(co_authors__icontains=filters.search)
+                search_q |= Q(journal_name__icontains=filters.search)
+            elif data_type == DataType.RESEARCH_PROJECT:
+                # 과제번호, 과제명, 연구책임자
+                search_q |= Q(project_number__icontains=filters.search)
+                search_q |= Q(project_name__icontains=filters.search)
+                search_q |= Q(principal_investigator__icontains=filters.search)
+            elif data_type == DataType.STUDENT_ROSTER:
+                # 이름, 학과, 지도교수, 이메일
                 search_q |= Q(name__icontains=filters.search)
                 search_q |= Q(department__icontains=filters.search)
-            elif data_type == DataType.BUDGET:
-                search_q |= Q(item__icontains=filters.search)
-                search_q |= Q(category__icontains=filters.search)
+                search_q |= Q(advisor__icontains=filters.search)
+                search_q |= Q(email__icontains=filters.search)
 
             queryset = queryset.filter(search_q)
 
@@ -250,10 +260,10 @@ class DataRepository:
     def _get_model_class(self, data_type: DataType):
         """데이터 유형에 맞는 ORM 모델 클래스 반환"""
         mapping = {
-            DataType.PERFORMANCE: Performance,
-            DataType.PAPER: Paper,
-            DataType.STUDENT: Student,
-            DataType.BUDGET: Budget,
+            DataType.DEPARTMENT_KPI: DepartmentKPI,
+            DataType.PUBLICATION: Publication,
+            DataType.RESEARCH_PROJECT: ResearchProject,
+            DataType.STUDENT_ROSTER: Student,
         }
         return mapping[data_type]
 
@@ -268,37 +278,78 @@ class DataRepository:
         Returns:
             UnifiedDataItem
         """
-        if data_type == DataType.PERFORMANCE:
+        # uploaded_by는 현재 모델에 없으므로 임시로 시스템 사용자로 설정
+        # TODO: 향후 uploaded_by ForeignKey 추가 후 수정
+        uploaded_by_email = "system@university.ac.kr"
+
+        if data_type == DataType.DEPARTMENT_KPI:
             return UnifiedDataItem(
                 id=obj.id,
                 data_type=data_type,
-                date=obj.date,
-                title=obj.title,
+                date=obj.created_at.date(),  # 평가년도는 extra_fields에
+                title=f"{obj.evaluation_year}년 {obj.department}",
                 uploaded_at=obj.created_at,
-                uploaded_by=obj.uploaded_by.email,
-                amount=obj.amount,
-                category=obj.category,
-                description=obj.description,
+                uploaded_by=uploaded_by_email,
+                amount=obj.tech_transfer_income,  # 기술이전 수입액
+                category=obj.college,
+                description=None,
+                extra_fields={
+                    "evaluation_year": obj.evaluation_year,
+                    "department": obj.department,
+                    "employment_rate": float(obj.employment_rate),
+                    "full_time_faculty": obj.full_time_faculty,
+                    "visiting_faculty": obj.visiting_faculty,
+                    "tech_transfer_income": float(obj.tech_transfer_income),
+                    "intl_conferences": obj.intl_conferences,
+                }
             )
 
-        elif data_type == DataType.PAPER:
+        elif data_type == DataType.PUBLICATION:
             return UnifiedDataItem(
                 id=obj.id,
                 data_type=data_type,
                 date=obj.publication_date,
-                title=obj.title,
+                title=obj.paper_title,
                 uploaded_at=obj.created_at,
-                uploaded_by=obj.uploaded_by.email,
-                category=obj.field,
+                uploaded_by=uploaded_by_email,
+                category=obj.department,
                 description=None,
                 extra_fields={
-                    "authors": obj.authors,
+                    "paper_id": obj.paper_id,
+                    "college": obj.college,
+                    "lead_author": obj.lead_author,
+                    "co_authors": obj.co_authors or "",
                     "journal_name": obj.journal_name,
-                    "doi": obj.doi,
+                    "journal_grade": obj.journal_grade,
+                    "impact_factor": float(obj.impact_factor) if obj.impact_factor else None,
+                    "project_linked": obj.project_linked,
                 }
             )
 
-        elif data_type == DataType.STUDENT:
+        elif data_type == DataType.RESEARCH_PROJECT:
+            return UnifiedDataItem(
+                id=obj.id,
+                data_type=data_type,
+                date=obj.execution_date,
+                title=obj.project_name,
+                uploaded_at=obj.created_at,
+                uploaded_by=uploaded_by_email,
+                amount=obj.execution_amount,  # 집행금액
+                category=obj.department,
+                description=obj.remarks or "",
+                extra_fields={
+                    "execution_id": obj.execution_id,
+                    "project_number": obj.project_number,
+                    "principal_investigator": obj.principal_investigator,
+                    "funding_agency": obj.funding_agency,
+                    "total_budget": obj.total_budget,
+                    "execution_item": obj.execution_item,
+                    "execution_amount": obj.execution_amount,
+                    "status": obj.status,
+                }
+            )
+
+        elif data_type == DataType.STUDENT_ROSTER:
             # Student는 날짜가 없으므로 created_at 사용
             return UnifiedDataItem(
                 id=obj.id,
@@ -306,31 +357,19 @@ class DataRepository:
                 date=obj.created_at.date(),  # datetime을 date로 변환
                 title=obj.name,
                 uploaded_at=obj.created_at,
-                uploaded_by=obj.uploaded_by.email,
+                uploaded_by=uploaded_by_email,
                 category=obj.department,
                 description=None,
                 extra_fields={
                     "student_id": obj.student_id,
+                    "college": obj.college,
                     "grade": obj.grade,
-                    "status": obj.status,
-                }
-            )
-
-        elif data_type == DataType.BUDGET:
-            # Budget도 날짜가 없으므로 created_at 사용
-            return UnifiedDataItem(
-                id=obj.id,
-                data_type=data_type,
-                date=obj.created_at.date(),
-                title=obj.item,
-                uploaded_at=obj.created_at,
-                uploaded_by=obj.uploaded_by.email,
-                amount=obj.amount,
-                category=obj.category,
-                description=obj.description,
-                extra_fields={
-                    "fiscal_year": obj.fiscal_year,
-                    "quarter": obj.quarter,
+                    "program_type": obj.program_type,
+                    "enrollment_status": obj.enrollment_status,
+                    "gender": obj.gender,
+                    "admission_year": obj.admission_year,
+                    "advisor": obj.advisor or "",
+                    "email": obj.email,
                 }
             )
 

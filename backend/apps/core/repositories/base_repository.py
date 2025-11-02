@@ -32,7 +32,7 @@ class BaseRepository(ABC):
             도메인 모델 객체 또는 None
         """
         try:
-            orm_obj = self.model.objects.get(id=id, is_deleted=False)
+            orm_obj = self.model.objects.get(id=id)
             return self._to_domain(orm_obj)
         except self.model.DoesNotExist:
             return None
@@ -47,7 +47,7 @@ class BaseRepository(ABC):
         Returns:
             도메인 모델 객체 리스트
         """
-        queryset = self.model.objects.filter(is_deleted=False)
+        queryset = self.model.objects.all()
 
         if filters:
             queryset = queryset.filter(**filters)
@@ -93,7 +93,7 @@ class BaseRepository(ABC):
             업데이트된 도메인 모델 객체 또는 None
         """
         try:
-            orm_obj = self.model.objects.get(id=id, is_deleted=False)
+            orm_obj = self.model.objects.get(id=id)
             for key, value in data.items():
                 setattr(orm_obj, key, value)
             orm_obj.save()
@@ -103,7 +103,7 @@ class BaseRepository(ABC):
 
     def delete(self, id: int) -> bool:
         """
-        객체 삭제 (소프트 삭제)
+        객체 삭제 (하드 삭제)
 
         Args:
             id: 객체 ID
@@ -112,9 +112,8 @@ class BaseRepository(ABC):
             삭제 성공 여부
         """
         try:
-            orm_obj = self.model.objects.get(id=id, is_deleted=False)
-            orm_obj.is_deleted = True
-            orm_obj.save()
+            orm_obj = self.model.objects.get(id=id)
+            orm_obj.delete()
             return True
         except self.model.DoesNotExist:
             return False
@@ -129,7 +128,7 @@ class BaseRepository(ABC):
         Returns:
             객체 개수
         """
-        queryset = self.model.objects.filter(is_deleted=False)
+        queryset = self.model.objects.all()
 
         if filters:
             queryset = queryset.filter(**filters)
