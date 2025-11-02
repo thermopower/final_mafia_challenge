@@ -1,0 +1,2 @@
+# Railway deployment - redirect to backend requirements
+-r backend/requirements/production.txt
