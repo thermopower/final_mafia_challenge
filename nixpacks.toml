@@ -1,11 +1,22 @@
-# Nixpacks Configuration for Railway Deployment (Backend Only)
-# Django Backend with Python 3.11
+# Nixpacks Configuration for Railway Deployment
+# Django Backend + React Frontend 통합 배포
 
 [phases.setup]
+# Python과 Node.js 자동 감지 (requirements.txt와 package.json 기반)
 aptPkgs = ["postgresql-client"]
 
+[phases.install]
+cmds = [
+    # Frontend 의존성 설치 및 빌드
+    "cd frontend && npm ci && npm run build",
+    # Backend 의존성은 Nixpacks가 requirements.txt를 자동 감지하여 설치
+]
+
 [phases.build]
-cmds = ["cd backend && python manage.py collectstatic --noinput"]
+cmds = [
+    # Django collectstatic: frontend/dist를 staticfiles로 수집
+    "cd backend && python manage.py collectstatic --noinput"
+]
 
 [start]
 cmd = "cd backend && python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
