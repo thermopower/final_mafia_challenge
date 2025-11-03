@@ -3,6 +3,7 @@
 
 [phases.setup]
 nixPkgs = ["python311"]
+nixpkgsArchive = "ba913eda2df8eb72147259189d55932012df6301"
 
 [phases.install]
 # 가상 환경을 생성하여 externally-managed-environment 오류 회피
@@ -16,9 +17,6 @@ cmds = [
 [variables]
 VIRTUAL_ENV = "/opt/venv"
 PYTHONPATH = "/app"
-
-[phases.setup]
-nixpkgsArchive = "ba913eda2df8eb72147259189d55932012df6301"
 
 [env]
 PATH = "/opt/venv/bin:/usr/local/bin:/usr/bin:/bin"
