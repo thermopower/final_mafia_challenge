@@ -2,16 +2,16 @@
 # Django REST API 배포 전용
 
 [phases.setup]
-# Nix 환경에서 Python과 pip를 함께 설치
-nixPkgs = ["python311", "python311Packages.pip"]
+nixPkgs = ["python311"]
 
 [phases.install]
-# Nix 환경에서는 pip가 이미 제공되므로 ensurepip 불필요
-# --user 플래그로 사용자 공간에 패키지 설치
+# 가상 환경을 생성하여 externally-managed-environment 오류 회피
 cmds = [
-    "pip install --user --upgrade pip setuptools wheel",
-    "pip install --user -r requirements/production.txt"
+    "python3.11 -m venv /opt/venv",
+    "/opt/venv/bin/pip install --upgrade pip setuptools wheel",
+    "/opt/venv/bin/pip install -r requirements/production.txt"
 ]
 
 [start]
-cmd = "python3.11 manage.py migrate && python3.11 manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
+# 가상 환경의 Python 사용
+cmd = "/opt/venv/bin/python manage.py migrate && /opt/venv/bin/python manage.py collectstatic --noinput && /opt/venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120"
