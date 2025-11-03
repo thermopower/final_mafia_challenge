@@ -196,21 +196,38 @@ npm test
 
 ---
 
-## 🚢 배포
+## 🚢 배포 (Hybrid Deployment)
 
-### Railway (Backend)
+이 프로젝트는 **하이브리드 배포** 방식을 사용합니다:
+- **백엔드**: Railway (Django REST API)
+- **프론트엔드**: Vercel (React SPA)
+- **데이터베이스**: Supabase (PostgreSQL)
 
-1. Railway 계정 생성
-2. GitHub 저장소 연결
-3. 환경 변수 설정
-4. 자동 배포
+### 배포 순서
 
-### Vercel (Frontend)
+#### 1. 백엔드 배포 (Railway)
+```bash
+# Railway Dashboard에서:
+1. New Project 생성
+2. Root Directory를 `/backend`로 설정
+3. 환경변수 설정 (SECRET_KEY, DATABASE_URL, CORS_ALLOWED_ORIGINS)
+4. 자동 배포 완료
+```
 
-1. Vercel 계정 생성
-2. GitHub 저장소 연결
-3. 환경 변수 설정
-4. 자동 배포
+#### 2. 프론트엔드 배포 (Vercel)
+```bash
+# Vercel Dashboard에서:
+1. New Project 생성
+2. Root Directory를 `frontend`로 설정
+3. 환경변수 설정 (VITE_API_URL, VITE_SUPABASE_URL)
+4. 자동 배포 완료
+```
+
+#### 3. CORS 설정
+```bash
+# Railway Variables에서:
+CORS_ALLOWED_ORIGINS=https://your-app.vercel.app
+```
 
 자세한 내용은 [DEPLOYMENT.md](./DEPLOYMENT.md)를 참고하세요.
 

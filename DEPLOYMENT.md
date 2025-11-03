@@ -1,506 +1,422 @@
-# Railway 통합 배포 가이드
+# 배포 가이드 (Hybrid Deployment)
 
-Django Backend와 React Frontend를 Railway에서 모두 배포하는 완전한 가이드입니다.
+## 배포 아키텍처
 
----
+이 프로젝트는 **하이브리드 배포** 방식을 사용합니다:
 
-## 목차
-
-1. [사전 준비](#사전-준비)
-2. [Supabase 설정](#supabase-설정)
-3. [Backend 배포 (Django)](#backend-배포-django)
-4. [Frontend 배포 (React)](#frontend-배포-react)
-5. [환경 변수 설정](#환경-변수-설정)
-6. [도메인 설정](#도메인-설정)
-7. [배포 후 테스트](#배포-후-테스트)
-8. [트러블슈팅](#트러블슈팅)
-
----
-
-## 사전 준비
-
-### 1. 필요한 계정
-- [Railway](https://railway.app/) 계정 (GitHub 계정으로 로그인)
-- [Supabase](https://supabase.com/) 계정
-- GitHub 계정 (코드 저장소)
-
-### 2. 로컬 환경 확인
-```bash
-# Git이 설치되어 있는지 확인
-git --version
-
-# Python 3.11 설치 확인
-python --version
-
-# Node.js 18+ 설치 확인
-node --version
-npm --version
+```
+┌─────────────────────────────────────────┐
+│         Hybrid Deployment               │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌──────────────┐    ┌──────────────┐  │
+│  │   Backend    │    │  Frontend    │  │
+│  │   (Railway)  │◄───┤  (Vercel)    │  │
+│  │              │    │              │  │
+│  │  Django API  │    │  React SPA   │  │
+│  │  Port: 8000  │    │              │  │
+│  └──────┬───────┘    └──────────────┘  │
+│         │                               │
+│         │                               │
+│  ┌──────▼───────────────────────────┐  │
+│  │  Supabase PostgreSQL + Auth      │  │
+│  └──────────────────────────────────┘  │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
-### 3. GitHub 저장소 푸시
-```bash
-# 로컬 코드를 GitHub에 Push
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-```
+**백엔드**: Railway (Django REST API)
+**프론트엔드**: Vercel (React SPA)
+**데이터베이스**: Supabase (PostgreSQL)
+**인증**: Supabase Auth
 
 ---
 
-## Supabase 설정
+## 1. 백엔드 배포 (Railway)
 
-### 1. Supabase 프로젝트 생성
-1. [Supabase Dashboard](https://app.supabase.com/)에 로그인
-2. **New Project** 클릭
-3. 프로젝트 정보 입력:
-   - **Name**: `university-dashboard`
-   - **Database Password**: 강력한 비밀번호 생성 (안전하게 보관!)
-   - **Region**: `Northeast Asia (Seoul)` 선택
-4. **Create new project** 클릭
+### 1.1 Railway 프로젝트 생성
 
-### 2. Supabase 연결 정보 확인
+1. **Railway Dashboard 접속**
+   - https://railway.app/dashboard
 
-#### ⚠️ 중요: Connection Pooler 사용 (Railway 배포 필수!)
+2. **New Project 생성**
+   - "New Project" 클릭
+   - "Deploy from GitHub repo" 선택
+   - 레포지토리 선택
 
-**Railway는 IPv6 아웃바운드 연결을 지원하지 않습니다.** Supabase Direct Connection(`db.*.supabase.co`)은 IPv6만 지원하므로 Railway에서 연결이 실패합니다.
+3. **Service 설정**
+   - Service 이름: `backend` (또는 원하는 이름)
+   - **Settings** > **Root Directory**: `/backend` 설정 (중요!)
+   - Railway가 자동으로 `backend/nixpacks.toml`과 `backend/railway.json`을 감지합니다
 
-**해결책: Supabase Connection Pooler (Supavisor) 사용**
-- ✅ IPv4 + IPv6 모두 지원
-- ✅ Connection Pooling 제공 (성능 향상)
-- ✅ 추가 비용 없음
+### 1.2 환경변수 설정 (필수)
 
-#### Connection Pooler 정보 확인 방법
+Railway Dashboard > Backend Service > **Variables** 탭에서 다음 환경변수를 추가:
 
-1. **Settings** → **Database** → **Connection Pooling** 섹션으로 이동
-2. **Session mode** 탭 선택 (Django 권장)
-3. 연결 문자열 복사:
-   ```
-   postgresql://postgres.[PROJECT-ID]:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-   ```
-
-**중요한 차이점:**
-- **USER**: `postgres.[PROJECT-ID]` (프로젝트 ID 포함!)
-- **HOST**: `aws-0-[REGION].pooler.supabase.com` (Pooler 주소)
-- **PORT**: `5432` (Session mode)
-
-#### 추가 정보 확인
-
-**Settings** → **API**에서:
-- **Project URL**: `https://xxxxxxxxxxxxx.supabase.co`
-- **anon public key**: `eyJhbG...` (공개 JWT 키)
-- **JWT Secret**: (Show를 눌러 확인)
-
----
-
-## Backend 배포 (Django)
-
-### 1. Railway 프로젝트 생성
-1. [Railway Dashboard](https://railway.app/dashboard)에 로그인
-2. **New Project** → **Deploy from GitHub repo** 선택
-3. GitHub 저장소 선택 후 Railway에 권한 허용
-4. 저장소 선택 후 **Deploy Now** 클릭
-
-### 2. Backend Service 설정
-1. Railway 프로젝트에서 **New** → **GitHub Repo** 클릭
-2. 저장소 선택 후 **Add variables** 클릭
-
-#### Root Directory 설정
-- **Settings** → **Service Settings** → **Root Directory** = `backend`
-
-#### Build 설정 (자동 감지로 생략 가능)
-Railway가 `.python-version`과 `requirements` 파일을 자동으로 감지합니다.
-
-수동으로 설정하고 싶다면:
-- **Build Command**: (비워둠 - Nixpacks 자동 감지)
-- **Start Command**: `python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application`
-
-### 3. Backend 환경 변수 설정
-**Variables** 탭에서 다음 환경 변수를 추가:
-
+#### 기본 설정 (필수)
 ```bash
-# Django 배포 설정
 DJANGO_SETTINGS_MODULE=config.settings.production
-SECRET_KEY=여기에-랜덤-시크릿-키-생성-필요-50자
 DEBUG=False
-ALLOWED_HOSTS=${{RAILWAY_PUBLIC_DOMAIN}},your-custom-domain.com
-
-# Database (Supabase Connection Pooler - Session Mode)
-# ⚠️ 반드시 Connection Pooler 사용! (Direct Connection은 Railway에서 작동 안 함)
-DATABASE_URL=postgresql://postgres.[PROJECT-ID]:YOUR_PASSWORD@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-
-# 개별 변수 (선택사항 - DATABASE_URL 사용 시 불필요)
-DB_NAME=postgres
-DB_USER=postgres.[PROJECT-ID]
-DB_PASSWORD=YOUR_SUPABASE_DB_PASSWORD
-DB_HOST=aws-0-ap-northeast-2.pooler.supabase.com
-DB_PORT=5432
-
-# Supabase Auth
-SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_JWT_SECRET=your-jwt-secret
-
-# CORS (Frontend URL - 배포 후 업데이트)
-CORS_ALLOWED_ORIGINS=https://your-frontend.railway.app,http://localhost:3000
-
-# Security (Production)
-SECURE_SSL_REDIRECT=True
-
-# Sentry (선택사항 - 에러 모니터링)
-SENTRY_DSN=
 ```
 
-**SECRET_KEY 생성 방법:**
+#### SECRET_KEY 생성 및 설정
+로컬에서 다음 명령어 실행:
 ```bash
+cd backend
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-### 4. Backend 배포 확인
-1. Railway가 배포 로그를 보여줍니다 (Deployments 탭)
-2. 배포 완료 후 **Settings** → **Generate Domain** 클릭
-3. 생성된 도메인 확인: `https://your-backend.railway.app`
-4. Health Check 테스트:
+생성된 키를 Railway Variables에 추가:
+```bash
+SECRET_KEY=<생성된-시크릿-키-50자-이상>
+```
+
+#### 데이터베이스 설정 (Supabase)
+```bash
+# DATABASE_URL 방식 (권장)
+DATABASE_URL=postgresql://postgres.atdtzgamsgpnkzjlktlo:JGu6OVp6vIVBibMM@aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres
+```
+
+#### ALLOWED_HOSTS 설정
+```bash
+ALLOWED_HOSTS=${{RAILWAY_PUBLIC_DOMAIN}},localhost,127.0.0.1
+```
+
+#### CORS 설정 (프론트엔드 도메인 - 배포 후 업데이트)
+```bash
+# 초기값 (로컬 개발용)
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# Vercel 배포 후 업데이트할 값:
+# CORS_ALLOWED_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
+```
+
+#### Supabase 설정
+```bash
+SUPABASE_URL=https://atdtzgamsgpnkzjlktlo.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0ZHR6Z2Ftc2dwbmt6amxrdGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTU2NDksImV4cCI6MjA3NzU5MTY0OX0.WzhfhNjHSCEpSAjT8x5kw3gEhWisMAEtl5iYlnrVtgk
+SUPABASE_JWT_SECRET=ADP1DHEVkX/mc8iNh8bJqjphRXDQr53DjoP76jr9jKjI/8PKD3L8reukRErm0beZF1mMZGnl0weXYyRwTs05zg==
+```
+
+### 1.3 배포 확인
+
+1. **Deploy Logs 확인**
+   - Railway Dashboard > Deployments 탭
+   - 빌드 및 배포 로그 확인
+
+2. **헬스체크 확인**
+   - 배포 완료 후 녹색 체크 표시 확인
+   - `/api/health/` 엔드포인트 자동 체크
+
+3. **API 테스트**
    ```bash
-   curl https://your-backend.railway.app/api/health/
+   curl https://your-backend.up.railway.app/api/health/
    # 응답: {"status":"healthy","service":"university-dashboard-api"}
    ```
 
+4. **도메인 확인**
+   - Railway가 자동으로 생성한 도메인 확인
+   - 예: `backend-production-xxxx.up.railway.app`
+   - **이 도메인을 복사해서 프론트엔드 환경변수에 사용합니다**
+
 ---
 
-## Frontend 배포 (React)
+## 2. 프론트엔드 배포 (Vercel)
 
-### 1. Frontend Service 생성
-1. 같은 Railway 프로젝트에서 **New** → **GitHub Repo** 클릭
-2. 같은 저장소 선택 (monorepo 구조)
+### 2.1 Vercel 프로젝트 생성
 
-### 2. Frontend Service 설정
-#### Root Directory 설정
-- **Settings** → **Service Settings** → **Root Directory** = `frontend`
+1. **Vercel Dashboard 접속**
+   - https://vercel.com/dashboard
 
-#### Build 설정
-Railway가 `package.json`을 자동으로 감지하지만, 확인 필요:
-- **Build Command**: `npm run build`
-- **Start Command**: (비워둠 - Docker 사용)
+2. **New Project 생성**
+   - "Add New..." > "Project" 클릭
+   - GitHub 레포지토리 선택
 
-#### Dockerfile 사용 (권장)
-Railway가 루트 디렉토리(`frontend/`)에 있는 `Dockerfile`을 자동으로 감지합니다.
+3. **프로젝트 설정**
+   - Framework Preset: **Vite** (자동 감지됨)
+   - **Root Directory**: `frontend` ← **폴더 아이콘 클릭 후 선택 (중요!)**
+   - Build Command: `npm run build` (자동 설정됨)
+   - Output Directory: `dist` (자동 설정됨)
+   - Install Command: `npm install` (자동 설정됨)
 
-만약 Dockerfile을 사용하지 않고 싶다면 다음으로 변경:
-- **Start Command**: `npx serve -s dist -l $PORT`
+### 2.2 환경변수 설정 (필수)
 
-### 3. Frontend 환경 변수 설정
-**Variables** 탭에서 다음 환경 변수를 추가:
+Vercel Dashboard > Your Project > **Settings** > **Environment Variables**에서 추가:
 
+#### API URL (백엔드 Railway 도메인)
 ```bash
-# API Backend URL (Backend 배포 완료 후 입력)
-VITE_API_URL=https://your-backend.railway.app/api
-
-# Supabase
-VITE_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_API_URL=https://your-backend.up.railway.app/api
 ```
 
-### 4. Frontend 배포 확인
-1. 배포 로그를 확인합니다
-2. 배포 완료 후 **Settings** → **Generate Domain** 클릭
-3. 생성된 도메인 확인: `https://your-frontend.railway.app`
-4. 브라우저에서 접속 테스트
-
-### 5. Backend CORS 업데이트
-Frontend 도메인이 생성되었으므로 Backend 환경 변수를 업데이트:
-1. Backend Service의 **Variables** 탭
-2. `CORS_ALLOWED_ORIGINS` 업데이트:
-   ```bash
-   CORS_ALLOWED_ORIGINS=https://your-frontend.railway.app,http://localhost:3000
-   ```
-3. Backend 자동 재배포 (환경 변수 변경 시 자동 재배포됨)
-
----
-
-## 환경 변수 설정
-
-### Backend 필수 환경 변수 체크리스트
-- [x] `DJANGO_SETTINGS_MODULE`
-- [x] `SECRET_KEY`
-- [x] `DEBUG`
-- [x] `ALLOWED_HOSTS`
-- [x] `DATABASE_URL`
-- [x] `SUPABASE_URL`
-- [x] `SUPABASE_ANON_KEY`
-- [x] `SUPABASE_JWT_SECRET`
-- [x] `CORS_ALLOWED_ORIGINS`
-
-### Frontend 필수 환경 변수 체크리스트
-- [x] `VITE_API_URL`
-- [x] `VITE_SUPABASE_URL`
-- [x] `VITE_SUPABASE_ANON_KEY`
-
----
-
-## 도메인 설정
-
-### Custom Domain 연결 (선택사항)
-
-#### Backend
-1. Backend Service → **Settings** → **Domains**
-2. **Custom Domain** 클릭
-3. 도메인 입력 (예: `api.yourdomain.com`)
-4. DNS 설정에 CNAME 레코드 추가:
-   ```
-   Type: CNAME
-   Name: api
-   Value: your-backend.railway.app
-   ```
-
-#### Frontend
-1. Frontend Service → **Settings** → **Domains**
-2. **Custom Domain** 클릭
-3. 도메인 입력 (예: `dashboard.yourdomain.com` 또는 `yourdomain.com`)
-4. DNS 설정에 CNAME 또는 A 레코드 추가
-
----
-
-## 배포 후 테스트
-
-### 1. Backend 테스트
+#### Supabase 설정
 ```bash
-# Health check
-curl https://your-backend.railway.app/api/health/
-
-# Admin 페이지 접속
-https://your-backend.railway.app/admin/
-
-# API 문서 확인
-https://your-backend.railway.app/api/docs/
+VITE_SUPABASE_URL=https://atdtzgamsgpnkzjlktlo.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0ZHR6Z2Ftc2dwbmt6amxrdGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTU2NDksImV4cCI6MjA3NzU5MTY0OX0.WzhfhNjHSCEpSAjT8x5kw3gEhWisMAEtl5iYlnrVtgk
 ```
 
-### 2. Frontend 테스트
-- 브라우저에서 `https://your-frontend.railway.app` 접속
-- 개발자 도구(F12) → Network 탭 확인
-  - API 호출이 정상적으로 Backend로 전송되는지 확인
-  - CORS 에러가 발생하지 않는지 확인
+**중요**: 환경변수 설정 후 **"Redeploy"** 버튼을 클릭하여 재배포해야 적용됩니다.
 
-### 3. Database 연결 확인
-```bash
-# Railway CLI 설치 (선택사항)
-npm i -g @railway/cli
+### 2.3 배포 확인
 
-# Railway 로그인
-railway login
+1. **Deployment 로그 확인**
+   - Vercel Dashboard > Deployments 탭
+   - 빌드 및 배포 로그 확인
 
-# Backend 프로젝트 연결
-railway link
+2. **도메인 확인**
+   - Vercel이 자동으로 생성한 도메인 확인
+   - 예: `your-project.vercel.app`
 
-# Django shell 실행
-railway run python manage.py shell
-
-# 데이터베이스 연결 테스트
->>> from django.db import connection
->>> connection.ensure_connection()
->>> print("Database connected!")
-```
-
-### 4. 추가 데이터베이스 설정
-```bash
-# Superuser 생성
-railway run python manage.py createsuperuser
-
-# Migrations 확인
-railway run python manage.py showmigrations
-
-# Static files 확인
-railway run python manage.py collectstatic --noinput
-```
+3. **웹사이트 접속 테스트**
+   - 브라우저에서 도메인 접속
+   - 로그인, 대시보드 등 주요 기능 테스트
 
 ---
 
-## 트러블슈팅
+## 3. CORS 설정 업데이트 (중요!)
 
-### 문제 1: 배포 실패 (Build Error)
+프론트엔드 배포 완료 후, **백엔드 CORS 설정을 반드시 업데이트**해야 합니다.
 
-**증상**: Railway 배포 로그에 에러 발생
+### 3.1 Railway에서 CORS_ALLOWED_ORIGINS 업데이트
+
+Railway Dashboard > Backend Service > **Variables**:
+
+```bash
+# Vercel 도메인을 추가
+CORS_ALLOWED_ORIGINS=https://your-project.vercel.app,http://localhost:5173
+```
+
+**형식 주의**:
+- 쉼표(`,`)로 구분
+- 공백 없이
+- `https://` 포함 (Vercel은 자동으로 HTTPS 제공)
+- localhost는 개발용으로 유지 가능
+
+### 3.2 재배포 확인
+
+- 환경변수 저장 시 Railway가 자동으로 재배포됩니다
+- Deploy Logs에서 재배포 완료 확인
+
+---
+
+## 4. 전체 배포 플로우 요약
+
+### 단계별 체크리스트
+
+#### ✅ 1단계: 백엔드 배포 (Railway)
+- [ ] Railway 프로젝트 생성
+- [ ] Root Directory를 `/backend`로 설정
+- [ ] 환경변수 설정 (SECRET_KEY, DATABASE_URL, ALLOWED_HOSTS 등)
+- [ ] 배포 완료 및 헬스체크 성공 확인
+- [ ] 백엔드 도메인 확인 및 복사
+
+#### ✅ 2단계: 프론트엔드 배포 (Vercel)
+- [ ] Vercel 프로젝트 생성
+- [ ] Root Directory를 `frontend`로 설정
+- [ ] 환경변수 설정 (VITE_API_URL에 백엔드 도메인 입력)
+- [ ] 배포 완료 확인
+- [ ] 프론트엔드 도메인 확인 및 복사
+
+#### ✅ 3단계: CORS 설정 (Railway)
+- [ ] Railway 환경변수 `CORS_ALLOWED_ORIGINS`에 Vercel 도메인 추가
+- [ ] 재배포 완료 확인
+
+#### ✅ 4단계: 테스트
+- [ ] 프론트엔드 접속 확인
+- [ ] 로그인 기능 테스트
+- [ ] API 호출 테스트 (CORS 에러 없는지 확인)
+- [ ] 데이터 업로드/조회 테스트
+
+---
+
+## 5. 환경변수 전체 목록
+
+### Backend (Railway)
+
+| 변수명 | 설명 | 필수 | 예시 |
+|--------|------|------|------|
+| `DJANGO_SETTINGS_MODULE` | Django 설정 모듈 | ✅ | `config.settings.production` |
+| `SECRET_KEY` | Django 시크릿 키 | ✅ | `django-insecure-xxx...` (50자 이상) |
+| `DEBUG` | 디버그 모드 | ✅ | `False` |
+| `DATABASE_URL` | PostgreSQL 연결 URL | ✅ | `postgresql://user:pass@host:5432/db` |
+| `ALLOWED_HOSTS` | 허용 도메인 | ✅ | `${{RAILWAY_PUBLIC_DOMAIN}}` |
+| `CORS_ALLOWED_ORIGINS` | CORS 허용 도메인 | ✅ | `https://your-app.vercel.app` |
+| `SUPABASE_URL` | Supabase 프로젝트 URL | ✅ | `https://xxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | Supabase Anon Key | ✅ | `eyJhbGci...` |
+| `SUPABASE_JWT_SECRET` | Supabase JWT Secret | ✅ | `ADP1DHE...` |
+| `SENTRY_DSN` | Sentry 에러 추적 (선택) | ❌ | `https://xxx@sentry.io/xxx` |
+
+### Frontend (Vercel)
+
+| 변수명 | 설명 | 필수 | 예시 |
+|--------|------|------|------|
+| `VITE_API_URL` | 백엔드 API URL | ✅ | `https://backend-xxx.railway.app/api` |
+| `VITE_SUPABASE_URL` | Supabase 프로젝트 URL | ✅ | `https://xxx.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Supabase Anon Key | ✅ | `eyJhbGci...` |
+
+---
+
+## 6. 문제 해결
+
+### 백엔드 배포 실패
+
+#### 헬스체크 실패
+```
+Error: Health check timeout
+```
 
 **해결 방법**:
-```bash
-# 1. requirements.txt 확인
-cd backend/requirements
-cat base.txt production.txt
+1. Deploy Logs에서 에러 확인
+2. 환경변수 누락 확인 (특히 `SECRET_KEY`, `DATABASE_URL`)
+3. Railway Dashboard에서 환경변수 재확인
 
-# 2. 로컬에서 설치 테스트
-pip install -r production.txt
-
-# 3. Python 버전 확인
-cat backend/.python-version  # 3.11이어야 함
-```
-
-### 문제 2: Database 연결 실패 (IPv6 문제)
-
-**증상**:
+#### 데이터베이스 연결 오류
 ```
 django.db.utils.OperationalError: could not connect to server
-Network is unreachable
-could not translate host name to address
 ```
 
-**원인**: Railway는 IPv6 아웃바운드 연결을 지원하지 않으며, Supabase Direct Connection은 IPv6만 지원합니다.
-
 **해결 방법**:
-1. ✅ **Connection Pooler 사용 (권장)**
-   - Supabase Dashboard → Settings → Database → Connection Pooling
-   - **Session mode** 선택
-   - 연결 문자열 복사:
-     ```bash
-     postgresql://postgres.[PROJECT-ID]:password@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-     ```
-   - Railway 환경 변수 `DATABASE_URL`에 입력
+1. `DATABASE_URL`이 올바른지 확인
+2. Supabase 연결 문자열이 정확한지 확인
+3. Supabase가 정상 작동 중인지 확인
 
-2. **연결 문자열 형식 확인**:
-   ```bash
-   # ❌ 잘못된 형식 (Direct Connection - Railway에서 작동 안 함)
-   postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres
+### 프론트엔드 배포 실패
 
-   # ✅ 올바른 형식 (Connection Pooler - Railway에서 작동)
-   postgresql://postgres.xxxxx:password@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-   ```
-
-3. **USER 형식 확인**:
-   - Direct Connection: `postgres`
-   - Connection Pooler: `postgres.[PROJECT-ID]` ⚠️ 프로젝트 ID 포함 필수!
-
-4. **대안 (추가 비용 발생)**:
-   - Supabase IPv4 Add-on 구매 (월 $4)
-   - Settings → Add-ons → IPv4 Address
-
-### 문제 3: CORS 에러
-
-**증상**: 브라우저 콘솔에서 `Access-Control-Allow-Origin` 에러
-
-**해결 방법**:
-1. Backend 환경 변수 확인:
-   ```bash
-   CORS_ALLOWED_ORIGINS=https://your-frontend.railway.app
-   ```
-2. Frontend URL이 정확한지 확인 (trailing slash 없이)
-3. Backend 자동 재배포
-
-### 문제 4: Static Files 404
-
-**증상**: Admin 페이지 CSS가 로드되지 않음
-
-**해결 방법**:
-```bash
-# WhiteNoise 설정 확인
-# backend/config/settings/production.py
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# collectstatic 재실행
-railway run python manage.py collectstatic --noinput --clear
+#### API 호출 CORS 에러
+```
+Access to fetch at 'https://backend.railway.app/api/...' has been blocked by CORS policy
 ```
 
-### 문제 5: Frontend 빌드 실패
-
-**증상**: Vite 빌드 중 에러 발생
-
 **해결 방법**:
-```bash
-# 로컬에서 빌드 테스트
-cd frontend
-npm run build
+1. Railway의 `CORS_ALLOWED_ORIGINS`에 Vercel 도메인이 추가되었는지 확인
+2. `https://`를 포함했는지 확인 (http가 아님)
+3. 쉼표 구분자에 공백이 없는지 확인
 
-# 타입 오류 확인
-npm run type-check
-
-# 수정 후 코드 재배포
-git add .
-git commit -m "Fix build errors"
-git push
+#### 환경변수 적용 안됨
+```
+VITE_API_URL is undefined
 ```
 
-### 문제 6: 환경 변수가 인식 안됨
+**해결 방법**:
+1. Vercel Dashboard > Settings > Environment Variables에서 변수 확인
+2. 환경변수 추가 후 **반드시 Redeploy** 실행
+3. 변수명이 `VITE_` 접두사로 시작하는지 확인
 
-**증상**: Frontend에서 `import.meta.env.VITE_API_URL`이 undefined
+### 인증 오류
+
+#### Supabase 토큰 검증 실패
+```
+Invalid JWT token
+```
 
 **해결 방법**:
-1. Railway Variables에서 `VITE_` 접두사 확인
-2. 빌드 시점에 환경 변수가 적용되는지 확인
-3. 재배포 (환경 변수 변경 후 반드시 재배포 필요)
+1. 백엔드의 `SUPABASE_JWT_SECRET`이 정확한지 확인
+2. 프론트엔드의 `VITE_SUPABASE_ANON_KEY`가 정확한지 확인
+3. Supabase Dashboard에서 키를 다시 복사하여 확인
 
 ---
 
-## 유용한 Railway CLI 명령어
-
-```bash
-# Railway 로그인
-railway login
-
-# 프로젝트 연결
-railway link
-
-# 로그 확인
-railway logs
-
-# 환경 변수 확인
-railway variables
-
-# 프로젝트 정보
-railway service
-
-# 로컬에서 Railway 환경 변수로 실행
-railway run python manage.py migrate
-```
-
----
-
-## 배포 체크리스트
+## 7. 로컬 개발 환경
 
 ### Backend
-- [x] `.python-version` 파일 존재
-- [x] `requirements/production.txt` 파일 존재
-- [x] `Procfile` 또는 `railway.toml` 설정
-- [x] `config/wsgi.py` 설정
-- [x] `DJANGO_SETTINGS_MODULE=config.settings.production`
-- [x] `SECRET_KEY` 설정
-- [x] `ALLOWED_HOSTS` 설정
-- [x] `DATABASE_URL` 설정
-- [x] `CORS_ALLOWED_ORIGINS` 설정
-- [x] WhiteNoise 설정
-- [x] Health check 엔드포인트 (`/api/health/`)
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements/development.txt
+cp .env.example .env
+# .env 파일 수정 (Supabase 정보 입력)
+python manage.py migrate
+python manage.py runserver
+```
 
 ### Frontend
-- [x] `package.json` 존재
-- [x] `vite.config.ts` 설정
-- [x] `Dockerfile` (권장) 또는 빌드 명령어 설정
-- [x] `nginx.conf` (Docker 사용 시)
-- [x] `VITE_API_URL` 환경 변수
-- [x] `VITE_SUPABASE_URL` 환경 변수
-- [x] `VITE_SUPABASE_ANON_KEY` 환경 변수
-
-### Database (Supabase)
-- [x] Supabase 프로젝트 생성
-- [x] Database 비밀번호 저장
-- [x] Connection pooling 설정 (선택사항)
-- [x] Migrations 실행
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+# .env.local 파일 수정 (백엔드 URL 입력)
+npm run dev
+```
 
 ---
 
-## 추가 리소스
+## 8. CI/CD (자동 배포)
+
+### Railway
+- **main** 브랜치에 push하면 자동 배포
+- Pull Request 생성 시 Preview 환경 자동 생성
+
+### Vercel
+- **main** 브랜치에 push하면 프로덕션 자동 배포
+- Pull Request 생성 시 Preview 배포 자동 생성
+- Preview URL에서 변경사항 미리 확인 가능
+
+---
+
+## 9. 모니터링
+
+### Railway
+- Dashboard > Deployments: 배포 로그 확인
+- Dashboard > Metrics: CPU, 메모리, 네트워크 사용량 확인
+
+### Vercel
+- Dashboard > Analytics: 페이지 뷰, 성능 메트릭 확인
+- Dashboard > Logs: 함수 로그 확인
+
+### Supabase
+- Dashboard > Database: 데이터베이스 상태 확인
+- Dashboard > Auth: 사용자 인증 로그 확인
+
+---
+
+## 10. 비용
+
+### Railway
+- 무료 티어: $5/월 크레딧
+- Hobby Plan: $5/월 (500시간 실행)
+- 예상 비용: 백엔드 서비스 1개 - 무료 티어로 충분
+
+### Vercel
+- Hobby Plan: 무료
+- 대역폭 제한: 100GB/월
+- 빌드 시간: 100시간/월
+- 예상 비용: 무료 (대부분의 프로젝트에 충분)
+
+### Supabase
+- Free Plan: 무료
+- 데이터베이스: 500MB
+- API 요청: 무제한
+- 예상 비용: 무료
+
+**총 예상 비용: $0/월** (무료 티어 사용 시)
+
+---
+
+## 11. 보안 체크리스트
+
+- [ ] `DEBUG=False` 설정 (프로덕션)
+- [ ] `SECRET_KEY` 50자 이상의 강력한 랜덤 문자열 사용
+- [ ] `ALLOWED_HOSTS` 정확하게 설정
+- [ ] `CORS_ALLOWED_ORIGINS` 신뢰할 수 있는 도메인만 추가
+- [ ] Supabase JWT Secret 노출 금지 (.env 파일 gitignore)
+- [ ] HTTPS 사용 (Railway, Vercel 자동 제공)
+- [ ] 환경변수를 코드에 하드코딩하지 않음
+- [ ] `.env` 파일을 Git에 커밋하지 않음
+
+---
+
+## 12. 추가 자료
 
 - [Railway 공식 문서](https://docs.railway.app/)
+- [Vercel 공식 문서](https://vercel.com/docs)
+- [Supabase 공식 문서](https://supabase.com/docs)
 - [Django 배포 체크리스트](https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/)
-- [Vite 배포 가이드](https://vitejs.dev/guide/static-deploy.html)
-- [Supabase 문서](https://supabase.com/docs)
 
 ---
 
-## 지원
+## 문의
 
-문제가 발생하면 다음을 확인하세요:
-1. Railway 배포 로그
-2. Backend Django 로그 (`railway logs`)
-3. Frontend 브라우저 콘솔
-4. GitHub Actions (CI/CD 설정 시)
-
-**Happy Deploying! 🚀**
+배포 중 문제가 발생하면:
+1. Deploy Logs 확인
+2. 환경변수 설정 재확인
+3. 이 문서의 문제 해결 섹션 참조
