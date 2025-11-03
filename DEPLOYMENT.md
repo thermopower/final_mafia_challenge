@@ -79,8 +79,16 @@ DATABASE_URL=postgresql://postgres.atdtzgamsgpnkzjlktlo:JGu6OVp6vIVBibMM@aws-1-a
 
 #### ALLOWED_HOSTS 설정
 ```bash
-ALLOWED_HOSTS=${{RAILWAY_PUBLIC_DOMAIN}},localhost,127.0.0.1
+# 첫 배포 시: Railway의 모든 도메인 허용
+ALLOWED_HOSTS=.railway.app,localhost,127.0.0.1
+
+# 배포 완료 후 특정 도메인으로 변경 (권장):
+# ALLOWED_HOSTS=backend-production-xxxx.up.railway.app,localhost,127.0.0.1
 ```
+
+**중요**:
+- 첫 배포 시에는 Railway 도메인이 아직 생성되지 않았으므로 `.railway.app` (모든 Railway 하위 도메인 허용)을 사용합니다
+- 배포 완료 후 Settings > Networking에서 생성된 도메인을 확인한 뒤, 해당 도메인으로 변경하는 것이 보안상 권장됩니다
 
 #### CORS 설정 (프론트엔드 도메인 - 배포 후 업데이트)
 ```bash
@@ -206,15 +214,17 @@ CORS_ALLOWED_ORIGINS=https://your-project.vercel.app,http://localhost:5173
 - [ ] Railway 프로젝트 생성
 - [ ] Root Directory를 `/backend`로 설정
 - [ ] 환경변수 설정 (SECRET_KEY, DATABASE_URL, ALLOWED_HOSTS 등)
+  - **ALLOWED_HOSTS**: `.railway.app,localhost,127.0.0.1` (첫 배포 시)
 - [ ] 배포 완료 및 헬스체크 성공 확인
-- [ ] 백엔드 도메인 확인 및 복사
+- [ ] 백엔드 도메인 확인 및 복사 (예: backend-production-xxxx.up.railway.app)
+- [ ] *(선택) ALLOWED_HOSTS를 특정 도메인으로 변경* (보안 강화)
 
 #### ✅ 2단계: 프론트엔드 배포 (Vercel)
 - [ ] Vercel 프로젝트 생성
 - [ ] Root Directory를 `frontend`로 설정
 - [ ] 환경변수 설정 (VITE_API_URL에 백엔드 도메인 입력)
 - [ ] 배포 완료 확인
-- [ ] 프론트엔드 도메인 확인 및 복사
+- [ ] 프론트엔드 도메인 확인 및 복사 (예: your-project.vercel.app)
 
 #### ✅ 3단계: CORS 설정 (Railway)
 - [ ] Railway 환경변수 `CORS_ALLOWED_ORIGINS`에 Vercel 도메인 추가
@@ -238,7 +248,7 @@ CORS_ALLOWED_ORIGINS=https://your-project.vercel.app,http://localhost:5173
 | `SECRET_KEY` | Django 시크릿 키 | ✅ | `django-insecure-xxx...` (50자 이상) |
 | `DEBUG` | 디버그 모드 | ✅ | `False` |
 | `DATABASE_URL` | PostgreSQL 연결 URL | ✅ | `postgresql://user:pass@host:5432/db` |
-| `ALLOWED_HOSTS` | 허용 도메인 | ✅ | `${{RAILWAY_PUBLIC_DOMAIN}}` |
+| `ALLOWED_HOSTS` | 허용 도메인 | ✅ | `.railway.app` (첫 배포) 또는 `backend-xxx.railway.app` (배포 후) |
 | `CORS_ALLOWED_ORIGINS` | CORS 허용 도메인 | ✅ | `https://your-app.vercel.app` |
 | `SUPABASE_URL` | Supabase 프로젝트 URL | ✅ | `https://xxx.supabase.co` |
 | `SUPABASE_ANON_KEY` | Supabase Anon Key | ✅ | `eyJhbGci...` |
