@@ -1065,3 +1065,12 @@ This architecture ensures:
 7. **Flexibility**: Easy to replace external services or databases
 
 By following these architectural guidelines, the project will be well-structured, maintainable, and aligned with industry best practices.
+
+---
+
+## Railway Nixpacks 배포 이슈 해결 (2025)
+
+### Python 3.11 externally-managed-environment 오류
+- **문제**: Nixpacks 환경에서 PEP 668로 인한 시스템 Python 환경 수정 차단
+- **해결**: `python3.11 -m venv /opt/venv`로 가상 환경 생성 후 격리된 환경에서 패키지 설치 및 실행
+- **적용**: backend/nixpacks.toml에서 모든 pip/python 명령어를 가상 환경 경로(`/opt/venv/bin/`)로 지정
