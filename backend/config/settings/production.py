@@ -21,6 +21,8 @@ cors_origins_raw = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000
 cors_origins = []
 for origin in cors_origins_raw.split(','):
     origin = origin.strip()
+    # Remove trailing slash if present (CORS origins should not have paths)
+    origin = origin.rstrip('/')
     # Skip empty or internal Railway domains without scheme
     if origin and not origin.endswith('.railway.internal'):
         # Add https:// if no scheme provided (except localhost)
