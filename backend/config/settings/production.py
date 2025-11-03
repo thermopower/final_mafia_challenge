@@ -66,6 +66,8 @@ else:
 
 # Security settings
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+# 헬스체크 경로는 SSL 리다이렉트에서 제외 (Railway 헬스체크용)
+SECURE_REDIRECT_EXEMPT = [r'^api/health/$']
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True

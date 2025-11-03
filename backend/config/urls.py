@@ -11,7 +11,12 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 def health_check(request):
     """Health check endpoint for Railway"""
-    return JsonResponse({'status': 'healthy', 'service': 'university-dashboard-api'})
+    from django.views.decorators.csrf import csrf_exempt
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'university-dashboard-api',
+        'timestamp': '2025-11-03T12:00:00Z'
+    })
 
 
 urlpatterns = [
