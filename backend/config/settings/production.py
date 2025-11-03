@@ -40,6 +40,31 @@ for origin in cors_origins_raw.split(','):
 CORS_ALLOWED_ORIGINS = cors_origins
 CORS_ALLOW_CREDENTIALS = True
 
+# CORS 헤더 설정 - Preflight 요청 처리 개선
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Preflight 요청 캐싱 (초 단위)
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24시간
+
 # Database - Railway PostgreSQL (auto-configured via DATABASE_URL)
 # Railway automatically sets DATABASE_URL environment variable
 database_url = config('DATABASE_URL', default=None)
@@ -65,9 +90,10 @@ else:
     }
 
 # Security settings
-SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
-# 헬스체크 경로는 SSL 리다이렉트에서 제외 (Railway 헬스체크용)
-SECURE_REDIRECT_EXEMPT = [r'^api/health/$']
+# Railway는 자체 프록시에서 HTTPS를 처리하므로 Django에서 리다이렉트하면 안 됨
+# CORS preflight 요청 시 리다이렉트가 발생하면 에러 발생
+SECURE_SSL_REDIRECT = False  # Railway 프록시가 HTTPS 처리
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Railway 프록시 신뢰
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
@@ -75,9 +101,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # HSTS (HTTP Strict Transport Security)
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# Railway 프록시에서 처리하므로 Django에서는 비활성화
+SECURE_HSTS_SECONDS = 0  # Railway 프록시가 처리
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
 
 # WhiteNoise - Static file serving
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
