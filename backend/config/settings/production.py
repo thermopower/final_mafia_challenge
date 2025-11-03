@@ -16,6 +16,10 @@ ALLOWED_HOSTS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
+# Railway 헬스체크 도메인 자동 추가
+if 'healthcheck.railway.app' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('healthcheck.railway.app')
+
 # CORS settings for production
 cors_origins_raw = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000')
 cors_origins = []
